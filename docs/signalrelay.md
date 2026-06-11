@@ -10,6 +10,10 @@ It exists to make externally owned state locally available before an application
 
 SignalRelay is pre-decision read infrastructure. StateMirror is post-decision evidence infrastructure.
 
+## Ecosystem position
+
+![SimpleStates decoupled architecture](assets/simplestates-decoupled-architecture.png)
+
 ## What It Is
 
 SignalRelay provides local availability for externally sourced state facts.
