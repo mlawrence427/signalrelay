@@ -36,6 +36,7 @@ SignalRelay currently includes:
 * [Changelog](CHANGELOG.md)
 * [SignalRelay concept note](docs/signalrelay.md)
 * [Local API](docs/api.md)
+* [Operations and security hardening checklist](docs/operations-security.md)
 * [Docker validation](docs/docker.md)
 * [Stripe CLI validation](docs/stripe-cli.md)
 * [Local signed webhook smoke test](docs/local-signed-webhook.md)

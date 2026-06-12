@@ -19,6 +19,7 @@
 * examples and PowerShell smoke tests
 * local signed webhook smoke test
 * Dockerfile and `.dockerignore` for local container builds
+* operations and security hardening checklist
 * Docker validation documentation
 * Stripe CLI validation documentation
 * API contract documentation
