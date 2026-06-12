@@ -1,6 +1,14 @@
 # SignalRelay
 
-SignalRelay is a SimpleStates concept and early local prototype for stale-aware local read infrastructure for externally sourced state facts.
+SignalRelay is an early local prototype for stale-aware Stripe subscription state envelopes.
+
+It is not production software.
+
+The `POST /v1/stripe/events` endpoint is unsigned demo ingestion only.
+
+Real Stripe webhook signature verification is not implemented yet.
+
+Do not expose the demo ingestion endpoint to the public internet.
 
 Core boundary:
 
@@ -8,22 +16,45 @@ Core boundary:
 
 > Freshness is evidence. Risk tolerance is application logic.
 
-Current status: early local prototype.
+## Current capabilities
 
-SignalRelay currently includes a minimal local HTTP service that can store and return stale-aware Stripe subscription state envelopes in memory.
+SignalRelay currently includes:
 
-It is not production software.
+* local HTTP service
+* manual state-envelope POST
+* unsigned demo Stripe-shaped event ingestion
+* duplicate demo event protection by `source_event_id`
+* local read API by `customer_id`
+* dynamic freshness computation
+* in-memory store by default
+* optional SQLite persistence
+* examples and PowerShell smoke scripts
 
-Read the concept note:
+## Documentation
 
 * [SignalRelay concept note](docs/signalrelay.md)
+* [Local API](docs/api.md)
 * [Prototype checkpoint](docs/checkpoints/prototype-1.md)
+
+## Non-capabilities
+
+SignalRelay does not:
+
+* evaluate authorization
+* decide access
+* return `allowed` or `denied`
+* enforce policy
+* orchestrate workflows
+* retry application actions
+* call Stripe APIs
+* verify Stripe signatures yet
+* expose a production webhook surface
+* replace Stripe as the source of truth
+* integrate with StateMirror yet
 
 SignalRelay is not a service mesh, feature flag system, policy engine, workflow engine, webhook platform, generic cache, or authorization layer.
 
 It is intended to explore local availability for externally sourced state facts while keeping application decisions application-owned.
-
-The prototype does not evaluate authorization, decide access, return `allowed` or `denied`, enforce policy, or orchestrate workflows.
 
 ## Local development
 
@@ -72,10 +103,6 @@ Available local endpoints:
 * `POST /v1/stripe/subscription-state`
 * `POST /v1/stripe/events`
 * `GET /v1/state/stripe/subscription?customer_id=...`
-
-API contract:
-
-* [Local API](docs/api.md)
 
 Write a Stripe subscription state envelope:
 
