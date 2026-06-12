@@ -1,8 +1,6 @@
 # SignalRelay
 
-SignalRelay is a future SimpleStates concept for stale-aware local read infrastructure for externally sourced state facts.
-
-It is not an active production project yet.
+SignalRelay is a SimpleStates concept and early local prototype for stale-aware local read infrastructure for externally sourced state facts.
 
 Core boundary:
 
@@ -10,7 +8,11 @@ Core boundary:
 
 > Freshness is evidence. Risk tolerance is application logic.
 
-Current status: concept / research note.
+Current status: early local prototype.
+
+SignalRelay currently includes a minimal local HTTP service that can store and return stale-aware Stripe subscription state envelopes in memory.
+
+It is not production software.
 
 Read the concept note:
 
@@ -20,17 +22,25 @@ SignalRelay is not a service mesh, feature flag system, policy engine, workflow 
 
 It is intended to explore local availability for externally sourced state facts while keeping application decisions application-owned.
 
+The prototype does not evaluate authorization, decide access, return `allowed` or `denied`, enforce policy, or orchestrate workflows.
+
 ## Local development
 
 Run the local service:
 
-```sh
+```bash
 go run ./cmd/signalrelay
 ```
 
+Available local endpoints:
+
+* `GET /healthz`
+* `POST /v1/stripe/subscription-state`
+* `GET /v1/state/stripe/subscription?customer_id=...`
+
 Write a Stripe subscription state envelope:
 
-```sh
+```bash
 curl -X POST http://localhost:8080/v1/stripe/subscription-state \
   -H "Content-Type: application/json" \
   -d '{
@@ -51,6 +61,6 @@ curl -X POST http://localhost:8080/v1/stripe/subscription-state \
 
 Read the local state envelope:
 
-```sh
+```bash
 curl "http://localhost:8080/v1/state/stripe/subscription?customer_id=cus_123"
 ```
