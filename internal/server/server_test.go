@@ -23,6 +23,7 @@ func TestHealthz(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
 
+	assertJSONContentType(t, rec)
 	assertJSONField(t, rec.Body.Bytes(), "ok", true)
 	assertNoDecisionFields(t, rec.Body.String())
 }
@@ -35,12 +36,14 @@ func TestPostStoresEnvelopeAndGetReturnsByCustomerID(t *testing.T) {
 	if post.Code != http.StatusCreated {
 		t.Fatalf("POST status = %d, want %d: %s", post.Code, http.StatusCreated, post.Body.String())
 	}
+	assertJSONContentType(t, post)
 	assertNoDecisionFields(t, post.Body.String())
 
 	get := request(t, srv, http.MethodGet, "/v1/state/stripe/subscription?customer_id=cus_123", nil)
 	if get.Code != http.StatusOK {
 		t.Fatalf("GET status = %d, want %d: %s", get.Code, http.StatusOK, get.Body.String())
 	}
+	assertJSONContentType(t, get)
 
 	assertJSONField(t, get.Body.Bytes(), "subject", "cus_123")
 	assertJSONField(t, get.Body.Bytes(), "state_type", "subscription")
@@ -61,6 +64,7 @@ func TestGetComputesFreshnessFresh(t *testing.T) {
 		t.Fatalf("GET status = %d, want %d: %s", get.Code, http.StatusOK, get.Body.String())
 	}
 
+	assertJSONContentType(t, get)
 	assertJSONField(t, get.Body.Bytes(), "freshness", "fresh")
 	assertNoDecisionFields(t, get.Body.String())
 }
@@ -76,6 +80,7 @@ func TestGetComputesFreshnessStale(t *testing.T) {
 		t.Fatalf("GET status = %d, want %d: %s", get.Code, http.StatusOK, get.Body.String())
 	}
 
+	assertJSONContentType(t, get)
 	assertJSONField(t, get.Body.Bytes(), "freshness", "stale")
 	assertNoDecisionFields(t, get.Body.String())
 }
@@ -88,6 +93,7 @@ func TestGetMissingCustomerReturns404(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
 	}
 
+	assertJSONContentType(t, rec)
 	assertJSONField(t, rec.Body.Bytes(), "error", "subscription_state_missing")
 	assertNoDecisionFields(t, rec.Body.String())
 }
@@ -154,6 +160,7 @@ func TestInvalidPostCasesReturn400(t *testing.T) {
 				t.Fatalf("status = %d, want %d: %s", rec.Code, http.StatusBadRequest, rec.Body.String())
 			}
 
+			assertJSONContentType(t, rec)
 			assertJSONField(t, rec.Body.Bytes(), "error", tc.wantError)
 			assertNoDecisionFields(t, rec.Body.String())
 		})
@@ -200,6 +207,14 @@ func assertJSONField(t *testing.T, body []byte, field string, want any) {
 
 	if got[field] != want {
 		t.Fatalf("%s = %v, want %v", field, got[field], want)
+	}
+}
+
+func assertJSONContentType(t *testing.T, rec *httptest.ResponseRecorder) {
+	t.Helper()
+
+	if got := rec.Header().Get("Content-Type"); got != "application/json" {
+		t.Fatalf("Content-Type = %q, want %q", got, "application/json")
 	}
 }
 
