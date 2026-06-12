@@ -38,6 +38,7 @@ SignalRelay currently includes:
 * [Local API](docs/api.md)
 * [Operations and security hardening checklist](docs/operations-security.md)
 * [Prototype release checklist](docs/release-checklist.md)
+* [Production deployment boundary guide](docs/production-deployment.md)
 * [StateMirror integration example](docs/statemirror-integration.md)
 * [Docker validation](docs/docker.md)
 * [Stripe CLI validation](docs/stripe-cli.md)

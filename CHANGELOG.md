@@ -22,6 +22,7 @@
 * local release build helper script
 * StateMirror integration example documentation
 * StateMirror-style premium access snapshot example
+* production deployment boundary guide
 * Dockerfile and `.dockerignore` for local container builds
 * operations and security hardening checklist
 * Docker validation documentation
