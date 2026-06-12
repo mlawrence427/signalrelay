@@ -83,6 +83,8 @@ Example request:
 }
 ```
 
+Static example payloads are available in `examples/`. Refresh their `observed_at` and `stale_after` values if you need a response to report `fresh`.
+
 ## GET /v1/state/stripe/subscription?customer_id=cus_123
 
 Returns the last observed envelope for `customer_id`.

@@ -1,0 +1,15 @@
+{
+  "source": "stripe",
+  "subject": "cus_123",
+  "state_type": "stripe.subscription",
+  "observed_at": "2020-01-01T00:00:00Z",
+  "stale_after": "2020-01-01T00:30:00Z",
+  "source_event_id": "evt_signalrelay_demo_stale",
+  "source_object_id": "sub_signalrelay_demo",
+  "payload": {
+    "customer_id": "cus_123",
+    "subscription_id": "sub_signalrelay_demo",
+    "status": "active",
+    "cancel_at_period_end": false
+  }
+}

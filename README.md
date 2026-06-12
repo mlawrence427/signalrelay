@@ -93,3 +93,23 @@ Read the local state envelope:
 ```bash
 curl "http://localhost:8080/v1/state/stripe/subscription?customer_id=cus_123"
 ```
+
+## Examples and smoke tests
+
+The `examples/` directory includes static Stripe subscription envelopes. Refresh `observed_at` and `stale_after` if you need an example response to report `fresh`.
+
+Memory mode:
+
+```powershell
+go run ./cmd/signalrelay
+.\scripts\smoke-memory.ps1
+```
+
+SQLite mode:
+
+```powershell
+$env:SIGNALRELAY_STORE="sqlite"
+$env:SIGNALRELAY_DB_PATH="signalrelay-dev.db"
+go run ./cmd/signalrelay
+.\scripts\smoke-sqlite.ps1
+```
