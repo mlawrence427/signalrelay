@@ -17,6 +17,29 @@ Important:
 
 Stripe CLI can forward sandbox events to a local endpoint with `stripe listen --forward-to`. The listen command prints a webhook signing secret that can be used to validate local webhook signatures.
 
+## Validation helper
+
+Run the interactive helper:
+
+```powershell
+.\scripts\validate-stripe-cli.ps1
+```
+
+The helper checks that Stripe CLI is available, prints the manual `stripe listen` command, asks for the printed webhook signing secret, reminds you to start SignalRelay with that secret, and runs:
+
+```powershell
+stripe trigger customer.subscription.updated
+```
+
+It does not automate Stripe login or secret extraction.
+
+## Validation status
+
+* local signed webhook smoke test: implemented and manually passed
+* Stripe CLI live forwarding: documented and scripted, manual execution required
+
+The local signed webhook smoke test can run without Stripe CLI. Stripe CLI live forwarding validation requires Stripe CLI and a Stripe sandbox/login.
+
 ## 1. Start SignalRelay with a local webhook secret
 
 Terminal 1:

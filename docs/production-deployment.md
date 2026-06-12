@@ -9,7 +9,7 @@ SignalRelay is still an early prototype. This guide explains what would need to 
 * memory and SQLite modes exist
 * Dockerfile exists
 * Docker validation is documented and scripted, but must be run in the local environment before release
-* Stripe CLI live forwarding is documented but not yet manually completed
+* Stripe CLI live forwarding is documented and scripted, but must be manually validated before release
 * no official release/tag exists yet
 
 ## Deployment shape

@@ -75,7 +75,7 @@ SignalRelay is an early prototype. This checklist documents operational and secu
 | --- | --- |
 | Signature-verified webhook ingestion | implemented |
 | Local signed smoke test | implemented |
-| Stripe CLI live forwarding validation | documented, not yet manually validated |
+| Stripe CLI live forwarding validation | documented and scripted, manual execution required |
 | Docker local build/run validation | documented and scripted, manual execution required |
 | Production deployment guide | not written |
 | Packaged release artifacts | not created |

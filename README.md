@@ -156,6 +156,12 @@ The prototype accepts unsigned demo Stripe-shaped subscription events at `POST /
 
 The separate `POST /v1/stripe/webhook` endpoint verifies `Stripe-Signature` with `SIGNALRELAY_STRIPE_WEBHOOK_SECRET` before reusing the same subscription event ingestion path. The secret is required only when calling the verified endpoint.
 
+Stripe CLI validation is documented in [Stripe CLI validation](docs/stripe-cli.md). The interactive helper is:
+
+```powershell
+.\scripts\validate-stripe-cli.ps1
+```
+
 Repeated demo Stripe events with the same event id are treated as duplicates and do not rewrite the stored envelope. This is duplicate event protection, not workflow retry orchestration.
 
 ## Container

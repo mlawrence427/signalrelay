@@ -21,6 +21,8 @@ Purpose: Document what must be true before tagging `v0.0.1-prototype`.
 * [ ] local signed webhook smoke test passes
 * [ ] Docker build/run validation completed or explicitly noted as not completed
 * [ ] Stripe CLI live forwarding validation completed or explicitly noted as not completed
+* [ ] run `.\scripts\validate-stripe-cli.ps1` when Stripe CLI is available
+* [ ] record whether Stripe CLI live forwarding passed or remains unvalidated
 * [ ] README prototype warnings reviewed
 * [ ] CHANGELOG reviewed
 * [ ] operations/security checklist reviewed
