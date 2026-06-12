@@ -118,6 +118,71 @@ func TestSQLiteDoesNotPersistFreshnessAsTrustedState(t *testing.T) {
 	}
 }
 
+func TestSQLiteMarkEventSeen(t *testing.T) {
+	store := newTestSQLite(t)
+
+	duplicate, subject, err := store.MarkEventSeen("evt_123", "cus_123")
+	if err != nil {
+		t.Fatalf("MarkEventSeen() error = %v", err)
+	}
+	if duplicate {
+		t.Fatal("duplicate = true, want false")
+	}
+	if subject != "cus_123" {
+		t.Fatalf("subject = %q, want %q", subject, "cus_123")
+	}
+
+	duplicate, subject, err = store.MarkEventSeen("evt_123", "cus_changed")
+	if err != nil {
+		t.Fatalf("MarkEventSeen() duplicate error = %v", err)
+	}
+	if !duplicate {
+		t.Fatal("duplicate = false, want true")
+	}
+	if subject != "cus_123" {
+		t.Fatalf("subject = %q, want original %q", subject, "cus_123")
+	}
+}
+
+func TestSQLiteMarkEventSeenPersistsAfterReopen(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "signalrelay.db")
+
+	first, err := NewSQLite(path)
+	if err != nil {
+		t.Fatalf("NewSQLite() error = %v", err)
+	}
+	duplicate, subject, err := first.MarkEventSeen("evt_123", "cus_123")
+	if err != nil {
+		t.Fatalf("MarkEventSeen() error = %v", err)
+	}
+	if duplicate {
+		t.Fatal("duplicate = true, want false")
+	}
+	if subject != "cus_123" {
+		t.Fatalf("subject = %q, want %q", subject, "cus_123")
+	}
+	if err := first.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+
+	second, err := NewSQLite(path)
+	if err != nil {
+		t.Fatalf("NewSQLite() reopen error = %v", err)
+	}
+	defer second.Close()
+
+	duplicate, subject, err = second.MarkEventSeen("evt_123", "cus_changed")
+	if err != nil {
+		t.Fatalf("MarkEventSeen() duplicate error = %v", err)
+	}
+	if !duplicate {
+		t.Fatal("duplicate = false, want true")
+	}
+	if subject != "cus_123" {
+		t.Fatalf("subject = %q, want original %q", subject, "cus_123")
+	}
+}
+
 func newTestSQLite(t *testing.T) *SQLite {
 	t.Helper()
 

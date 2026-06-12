@@ -13,6 +13,7 @@ import (
 type Store interface {
 	Put(envelope.Envelope) error
 	Get(subject string) (envelope.Envelope, bool, error)
+	MarkEventSeen(sourceEventID string, subject string) (bool, string, error)
 }
 
 type Server struct {
@@ -101,6 +102,20 @@ func (s *Server) handlePostStripeEvent(w http.ResponseWriter, r *http.Request) {
 	env, err := s.envelopeFromStripeEvent(event)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	duplicate, subject, err := s.store.MarkEventSeen(env.SourceEventID, env.Subject)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "store_event_failed")
+		return
+	}
+	if duplicate {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"duplicate":       true,
+			"source_event_id": env.SourceEventID,
+			"subject":         subject,
+		})
 		return
 	}
 

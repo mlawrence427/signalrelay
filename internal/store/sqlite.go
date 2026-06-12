@@ -46,6 +46,15 @@ CREATE TABLE IF NOT EXISTS subscription_states (
 	payload_hash TEXT NOT NULL,
 	payload TEXT NOT NULL
 )`)
+	if err != nil {
+		return err
+	}
+
+	_, err = s.db.ExecContext(ctx, `
+CREATE TABLE IF NOT EXISTS ingested_events (
+	source_event_id TEXT PRIMARY KEY,
+	subject TEXT NOT NULL
+)`)
 	return err
 }
 
@@ -138,4 +147,43 @@ WHERE subject = ?`,
 
 	env.Payload = json.RawMessage(payload)
 	return env, true, nil
+}
+
+func (s *SQLite) MarkEventSeen(sourceEventID string, subject string) (bool, string, error) {
+	result, err := s.db.ExecContext(
+		context.Background(),
+		`
+INSERT OR IGNORE INTO ingested_events (
+	source_event_id,
+	subject
+) VALUES (?, ?)`,
+		sourceEventID,
+		subject,
+	)
+	if err != nil {
+		return false, "", err
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return false, "", err
+	}
+	if rows == 1 {
+		return false, subject, nil
+	}
+
+	var existingSubject string
+	err = s.db.QueryRowContext(
+		context.Background(),
+		`
+SELECT subject
+FROM ingested_events
+WHERE source_event_id = ?`,
+		sourceEventID,
+	).Scan(&existingSubject)
+	if err != nil {
+		return false, "", err
+	}
+
+	return true, existingSubject, nil
 }

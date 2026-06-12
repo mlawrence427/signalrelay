@@ -98,6 +98,8 @@ curl "http://localhost:8080/v1/state/stripe/subscription?customer_id=cus_123"
 
 The prototype also accepts unsigned demo Stripe-shaped subscription events at `POST /v1/stripe/events`. Real Stripe webhook signature verification is not implemented.
 
+Repeated demo Stripe events with the same event id are treated as duplicates and do not rewrite the stored envelope. This is duplicate event protection, not workflow retry orchestration.
+
 ## Examples and smoke tests
 
 The `examples/` directory includes static Stripe subscription envelopes. Refresh `observed_at` and `stale_after` if you need an example response to report `fresh`.

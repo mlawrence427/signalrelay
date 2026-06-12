@@ -140,6 +140,22 @@ Mapping:
 
 The response is the stored envelope response. It never includes `allowed` or `denied`.
 
+Duplicate event handling:
+
+SignalRelay records ingested Stripe event ids by `source_event_id`. Reposting the same event id does not rewrite the stored envelope.
+
+Duplicate response:
+
+```json
+{
+  "duplicate": true,
+  "source_event_id": "evt_123",
+  "subject": "cus_123"
+}
+```
+
+This is duplicate event protection for the local observed-state store. It is not workflow retry orchestration.
+
 An example event payload is available at `examples/stripe-event-subscription-updated.json`.
 
 ## GET /v1/state/stripe/subscription?customer_id=cus_123

@@ -9,11 +9,13 @@ import (
 type Memory struct {
 	mu        sync.RWMutex
 	bySubject map[string]envelope.Envelope
+	events    map[string]string
 }
 
 func NewMemory() *Memory {
 	return &Memory{
 		bySubject: make(map[string]envelope.Envelope),
+		events:    make(map[string]string),
 	}
 }
 
@@ -31,4 +33,17 @@ func (s *Memory) Get(subject string) (envelope.Envelope, bool, error) {
 
 	env, ok := s.bySubject[subject]
 	return env, ok, nil
+}
+
+func (s *Memory) MarkEventSeen(sourceEventID string, subject string) (bool, string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	existingSubject, ok := s.events[sourceEventID]
+	if ok {
+		return true, existingSubject, nil
+	}
+
+	s.events[sourceEventID] = subject
+	return false, subject, nil
 }

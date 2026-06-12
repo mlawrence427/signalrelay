@@ -169,6 +169,49 @@ func TestGetReturnsEnvelopeStoredFromStripeEvent(t *testing.T) {
 	assertNoDecisionFields(t, get.Body.String())
 }
 
+func TestDuplicateStripeEventReturnsDuplicateResponse(t *testing.T) {
+	srv := newTestServer(t, time.Date(2026, 6, 11, 12, 0, 0, 0, time.UTC))
+
+	first := request(t, srv, http.MethodPost, "/v1/stripe/events", stripeEventBody("customer.subscription.updated"))
+	if first.Code != http.StatusCreated {
+		t.Fatalf("first status = %d, want %d: %s", first.Code, http.StatusCreated, first.Body.String())
+	}
+
+	duplicate := request(t, srv, http.MethodPost, "/v1/stripe/events", stripeEventBody("customer.subscription.updated"))
+	if duplicate.Code != http.StatusOK {
+		t.Fatalf("duplicate status = %d, want %d: %s", duplicate.Code, http.StatusOK, duplicate.Body.String())
+	}
+
+	assertJSONContentType(t, duplicate)
+	assertJSONField(t, duplicate.Body.Bytes(), "duplicate", true)
+	assertJSONField(t, duplicate.Body.Bytes(), "source_event_id", "evt_123")
+	assertJSONField(t, duplicate.Body.Bytes(), "subject", "cus_123")
+	assertNoDecisionFields(t, duplicate.Body.String())
+}
+
+func TestDuplicateStripeEventDoesNotOverwriteStoredEnvelope(t *testing.T) {
+	srv := newTestServer(t, time.Date(2026, 6, 11, 12, 0, 0, 0, time.UTC))
+
+	first := request(t, srv, http.MethodPost, "/v1/stripe/events", stripeEventBodyWithObject("evt_123", "sub_123", "active"))
+	if first.Code != http.StatusCreated {
+		t.Fatalf("first status = %d, want %d: %s", first.Code, http.StatusCreated, first.Body.String())
+	}
+
+	duplicate := request(t, srv, http.MethodPost, "/v1/stripe/events", stripeEventBodyWithObject("evt_123", "sub_changed", "canceled"))
+	if duplicate.Code != http.StatusOK {
+		t.Fatalf("duplicate status = %d, want %d: %s", duplicate.Code, http.StatusOK, duplicate.Body.String())
+	}
+
+	get := request(t, srv, http.MethodGet, "/v1/state/stripe/subscription?customer_id=cus_123", nil)
+	if get.Code != http.StatusOK {
+		t.Fatalf("GET status = %d, want %d: %s", get.Code, http.StatusOK, get.Body.String())
+	}
+
+	assertJSONField(t, get.Body.Bytes(), "source_object_id", "sub_123")
+	assertPayloadField(t, get.Body.Bytes(), "status", "active")
+	assertNoDecisionFields(t, get.Body.String())
+}
+
 func TestStripeEventCreatedAndDeletedAreAccepted(t *testing.T) {
 	for _, eventType := range []string{"customer.subscription.created", "customer.subscription.deleted"} {
 		t.Run(eventType, func(t *testing.T) {
@@ -381,6 +424,11 @@ func stripeEventBody(eventType string) *strings.Reader {
 	return strings.NewReader(body)
 }
 
+func stripeEventBodyWithObject(eventID string, subscriptionID string, status string) *strings.Reader {
+	body := `{"id":"` + eventID + `","type":"customer.subscription.updated","created":1760000000,"data":{"object":{"id":"` + subscriptionID + `","object":"subscription","customer":"cus_123","status":"` + status + `","current_period_end":1762600000,"cancel_at_period_end":false}}}`
+	return strings.NewReader(body)
+}
+
 func assertJSONField(t *testing.T, body []byte, field string, want any) {
 	t.Helper()
 
@@ -391,6 +439,21 @@ func assertJSONField(t *testing.T, body []byte, field string, want any) {
 
 	if got[field] != want {
 		t.Fatalf("%s = %v, want %v", field, got[field], want)
+	}
+}
+
+func assertPayloadField(t *testing.T, body []byte, field string, want any) {
+	t.Helper()
+
+	var got struct {
+		Payload map[string]any `json:"payload"`
+	}
+	if err := json.Unmarshal(body, &got); err != nil {
+		t.Fatalf("response is not JSON: %v: %s", err, string(body))
+	}
+
+	if got.Payload[field] != want {
+		t.Fatalf("payload.%s = %v, want %v", field, got.Payload[field], want)
 	}
 }
 
