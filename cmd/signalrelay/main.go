@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/mlawrence427/signalrelay/internal/config"
 	"github.com/mlawrence427/signalrelay/internal/server"
@@ -10,6 +11,10 @@ import (
 )
 
 func main() {
+	if handled, code := handleCLI(os.Args[1:], os.Stdout, os.Stderr); handled {
+		os.Exit(code)
+	}
+
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatal(err)

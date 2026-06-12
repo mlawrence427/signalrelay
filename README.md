@@ -59,6 +59,13 @@ $env:SIGNALRELAY_DB_PATH="signalrelay.db"
 go run ./cmd/signalrelay
 ```
 
+CLI inspection:
+
+```bash
+go run ./cmd/signalrelay --version
+go run ./cmd/signalrelay --help
+```
+
 Available local endpoints:
 
 * `GET /healthz`
