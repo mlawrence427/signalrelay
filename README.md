@@ -37,6 +37,7 @@ SignalRelay currently includes:
 * [SignalRelay concept note](docs/signalrelay.md)
 * [Local API](docs/api.md)
 * [Operations and security hardening checklist](docs/operations-security.md)
+* [Prototype release checklist](docs/release-checklist.md)
 * [Docker validation](docs/docker.md)
 * [Stripe CLI validation](docs/stripe-cli.md)
 * [Local signed webhook smoke test](docs/local-signed-webhook.md)
@@ -105,6 +106,14 @@ CLI inspection:
 go run ./cmd/signalrelay --version
 go run ./cmd/signalrelay --help
 ```
+
+Local prototype release builds:
+
+```powershell
+.\scripts\build-release.ps1
+```
+
+The script writes generated binaries to `dist/`. Those files are local artifacts and are not committed.
 
 Available local endpoints:
 

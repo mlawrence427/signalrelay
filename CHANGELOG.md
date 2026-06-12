@@ -18,6 +18,8 @@
 * CLI inspection flags
 * examples and PowerShell smoke tests
 * local signed webhook smoke test
+* prototype release checklist
+* local release build helper script
 * Dockerfile and `.dockerignore` for local container builds
 * operations and security hardening checklist
 * Docker validation documentation
