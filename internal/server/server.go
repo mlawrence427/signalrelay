@@ -11,8 +11,8 @@ import (
 )
 
 type Store interface {
-	Put(envelope.Envelope)
-	Get(subject string) (envelope.Envelope, bool)
+	Put(envelope.Envelope) error
+	Get(subject string) (envelope.Envelope, bool, error)
 }
 
 type Server struct {
@@ -59,7 +59,10 @@ func (s *Server) handlePostSubscriptionState(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	s.store.Put(env)
+	if err := s.store.Put(env); err != nil {
+		writeError(w, http.StatusInternalServerError, "store_write_failed")
+		return
+	}
 
 	writeJSON(w, http.StatusCreated, env.WithFreshness(s.now()))
 }
@@ -71,7 +74,11 @@ func (s *Server) handleGetSubscriptionState(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	env, ok := s.store.Get(customerID)
+	env, ok, err := s.store.Get(customerID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "store_read_failed")
+		return
+	}
 	if !ok {
 		writeError(w, http.StatusNotFound, "subscription_state_missing")
 		return

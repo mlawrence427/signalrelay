@@ -2,7 +2,27 @@
 
 This document describes the current local HTTP API for the SignalRelay prototype.
 
-The API is limited to storing and reading stale-aware Stripe subscription state envelopes in memory. It does not verify real Stripe webhook signatures, persist state, authenticate requests, or evaluate access.
+The API is limited to storing and reading stale-aware Stripe subscription state envelopes. The default local prototype store is in memory. Optional SQLite persistence can be enabled explicitly with `SIGNALRELAY_STORE=sqlite`.
+
+The API does not verify real Stripe webhook signatures, authenticate requests, or evaluate access.
+
+## Local Storage
+
+The default local prototype store is in memory.
+
+To use optional SQLite persistence:
+
+```bash
+SIGNALRELAY_STORE=sqlite SIGNALRELAY_DB_PATH=signalrelay.db go run ./cmd/signalrelay
+```
+
+On Windows PowerShell:
+
+```powershell
+$env:SIGNALRELAY_STORE="sqlite"
+$env:SIGNALRELAY_DB_PATH="signalrelay.db"
+go run ./cmd/signalrelay
+```
 
 ## GET /healthz
 
@@ -16,7 +36,7 @@ Response:
 
 ## POST /v1/stripe/subscription-state
 
-Stores the last observed Stripe subscription state envelope in memory.
+Stores the last observed Stripe subscription state envelope in the configured local store.
 
 Request fields:
 

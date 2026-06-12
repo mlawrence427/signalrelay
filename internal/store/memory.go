@@ -17,17 +17,18 @@ func NewMemory() *Memory {
 	}
 }
 
-func (s *Memory) Put(env envelope.Envelope) {
+func (s *Memory) Put(env envelope.Envelope) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	s.bySubject[env.Subject] = env
+	return nil
 }
 
-func (s *Memory) Get(subject string) (envelope.Envelope, bool) {
+func (s *Memory) Get(subject string) (envelope.Envelope, bool, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	env, ok := s.bySubject[subject]
-	return env, ok
+	return env, ok, nil
 }

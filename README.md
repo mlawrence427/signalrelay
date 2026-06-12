@@ -32,6 +32,22 @@ Run the local service:
 go run ./cmd/signalrelay
 ```
 
+The default local prototype store is in memory.
+
+To use optional SQLite persistence:
+
+```bash
+SIGNALRELAY_STORE=sqlite SIGNALRELAY_DB_PATH=signalrelay.db go run ./cmd/signalrelay
+```
+
+On Windows PowerShell:
+
+```powershell
+$env:SIGNALRELAY_STORE="sqlite"
+$env:SIGNALRELAY_DB_PATH="signalrelay.db"
+go run ./cmd/signalrelay
+```
+
 Available local endpoints:
 
 * `GET /healthz`

@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mlawrence427/signalrelay/internal/envelope"
 	"github.com/mlawrence427/signalrelay/internal/store"
 )
 
@@ -82,6 +83,49 @@ func TestGetComputesFreshnessStale(t *testing.T) {
 
 	assertJSONContentType(t, get)
 	assertJSONField(t, get.Body.Bytes(), "freshness", "stale")
+	assertNoDecisionFields(t, get.Body.String())
+}
+
+func TestGetComputesFreshnessFromSQLiteStoredEnvelope(t *testing.T) {
+	now := time.Date(2026, 6, 11, 12, 0, 0, 0, time.UTC)
+
+	sqliteStore, err := store.NewSQLite(t.TempDir() + "/signalrelay.db")
+	if err != nil {
+		t.Fatalf("NewSQLite() error = %v", err)
+	}
+	t.Cleanup(func() {
+		if err := sqliteStore.Close(); err != nil {
+			t.Fatalf("Close() error = %v", err)
+		}
+	})
+
+	payload := json.RawMessage(`{"customer_id":"cus_123","subscription_id":"sub_123","status":"active"}`)
+	env := envelope.Envelope{
+		Source:         "stripe",
+		Subject:        "cus_123",
+		StateType:      "subscription",
+		ObservedAt:     now.Add(-time.Minute),
+		StaleAfter:     now.Add(time.Minute),
+		Freshness:      "stale",
+		SourceEventID:  "evt_123",
+		SourceObjectID: "sub_123",
+		PayloadHash:    envelope.HashPayload(payload),
+		Payload:        payload,
+	}
+	if err := sqliteStore.Put(env); err != nil {
+		t.Fatalf("Put() error = %v", err)
+	}
+
+	srv := New(sqliteStore)
+	srv.now = func() time.Time { return now }
+
+	get := request(t, srv, http.MethodGet, "/v1/state/stripe/subscription?customer_id=cus_123", nil)
+	if get.Code != http.StatusOK {
+		t.Fatalf("GET status = %d, want %d: %s", get.Code, http.StatusOK, get.Body.String())
+	}
+
+	assertJSONContentType(t, get)
+	assertJSONField(t, get.Body.Bytes(), "freshness", "fresh")
 	assertNoDecisionFields(t, get.Body.String())
 }
 
