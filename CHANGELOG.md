@@ -19,6 +19,7 @@
 * examples and PowerShell smoke tests
 * Dockerfile and `.dockerignore` for local container builds
 * Docker validation documentation
+* Stripe CLI validation documentation
 * API contract documentation
 * prototype checkpoint documentation
 * Prototype Checkpoint 3 documentation
