@@ -35,11 +35,14 @@ Environment:
   SIGNALRELAY_STORE
   SIGNALRELAY_DB_PATH
   SIGNALRELAY_STRIPE_STALE_AFTER_SECONDS
+  SIGNALRELAY_STRIPE_WEBHOOK_SECRET
+  SIGNALRELAY_STRIPE_SIGNATURE_TOLERANCE_SECONDS
 
 Local endpoints:
   GET /healthz
   POST /v1/stripe/subscription-state
   POST /v1/stripe/events
+  POST /v1/stripe/webhook
   GET /v1/state/stripe/subscription?customer_id=...
 
 Boundary:

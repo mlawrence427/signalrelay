@@ -14,18 +14,22 @@ const (
 )
 
 type Config struct {
-	Addr                    string
-	Store                   string
-	DBPath                  string
-	StripeStaleAfterSeconds int
+	Addr                            string
+	Store                           string
+	DBPath                          string
+	StripeStaleAfterSeconds         int
+	StripeWebhookSecret             string
+	StripeSignatureToleranceSeconds int
 }
 
 func Load() (Config, error) {
 	cfg := Config{
-		Addr:                    getEnv("SIGNALRELAY_ADDR", ":8080"),
-		Store:                   strings.ToLower(getEnv("SIGNALRELAY_STORE", StoreMemory)),
-		DBPath:                  getEnv("SIGNALRELAY_DB_PATH", "signalrelay.db"),
-		StripeStaleAfterSeconds: 300,
+		Addr:                            getEnv("SIGNALRELAY_ADDR", ":8080"),
+		Store:                           strings.ToLower(getEnv("SIGNALRELAY_STORE", StoreMemory)),
+		DBPath:                          getEnv("SIGNALRELAY_DB_PATH", "signalrelay.db"),
+		StripeStaleAfterSeconds:         300,
+		StripeWebhookSecret:             os.Getenv("SIGNALRELAY_STRIPE_WEBHOOK_SECRET"),
+		StripeSignatureToleranceSeconds: 300,
 	}
 
 	staleAfterSeconds, err := parsePositiveIntEnv("SIGNALRELAY_STRIPE_STALE_AFTER_SECONDS", 300)
@@ -33,6 +37,12 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	cfg.StripeStaleAfterSeconds = staleAfterSeconds
+
+	signatureToleranceSeconds, err := parsePositiveIntEnv("SIGNALRELAY_STRIPE_SIGNATURE_TOLERANCE_SECONDS", 300)
+	if err != nil {
+		return Config{}, err
+	}
+	cfg.StripeSignatureToleranceSeconds = signatureToleranceSeconds
 
 	switch cfg.Store {
 	case StoreMemory, StoreSQLite:
@@ -44,6 +54,10 @@ func Load() (Config, error) {
 
 func (c Config) StripeStaleAfterDuration() time.Duration {
 	return time.Duration(c.StripeStaleAfterSeconds) * time.Second
+}
+
+func (c Config) StripeSignatureToleranceDuration() time.Duration {
+	return time.Duration(c.StripeSignatureToleranceSeconds) * time.Second
 }
 
 func StoreError(store string) error {

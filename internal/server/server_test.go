@@ -2,7 +2,11 @@ package server
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -352,6 +356,134 @@ func TestStripeEventFreshnessUsesConfiguredStaleAfterSeconds(t *testing.T) {
 	assertNoDecisionFields(t, rec.Body.String())
 }
 
+func TestStripeWebhookValidSignatureStoresEnvelope(t *testing.T) {
+	now := time.Unix(1760000030, 0).UTC()
+	srv := newWebhookTestServer(t, now, "whsec_test", 300*time.Second)
+
+	body := stripeEventBodyString("customer.subscription.updated")
+	rec := requestWithHeaders(t, srv, http.MethodPost, "/v1/stripe/webhook", strings.NewReader(body), map[string]string{
+		"Stripe-Signature": stripeSignatureHeader(t, "whsec_test", 1760000000, body),
+	})
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d: %s", rec.Code, http.StatusCreated, rec.Body.String())
+	}
+
+	assertJSONContentType(t, rec)
+	assertJSONField(t, rec.Body.Bytes(), "source_event_id", "evt_123")
+	assertJSONField(t, rec.Body.Bytes(), "subject", "cus_123")
+	assertNoDecisionFields(t, rec.Body.String())
+
+	get := request(t, srv, http.MethodGet, "/v1/state/stripe/subscription?customer_id=cus_123", nil)
+	if get.Code != http.StatusOK {
+		t.Fatalf("GET status = %d, want %d: %s", get.Code, http.StatusOK, get.Body.String())
+	}
+	assertJSONField(t, get.Body.Bytes(), "source_event_id", "evt_123")
+	assertNoDecisionFields(t, get.Body.String())
+}
+
+func TestStripeWebhookDuplicateReturnsDuplicateResponse(t *testing.T) {
+	now := time.Unix(1760000030, 0).UTC()
+	srv := newWebhookTestServer(t, now, "whsec_test", 300*time.Second)
+
+	body := stripeEventBodyString("customer.subscription.updated")
+	headers := map[string]string{
+		"Stripe-Signature": stripeSignatureHeader(t, "whsec_test", 1760000000, body),
+	}
+
+	first := requestWithHeaders(t, srv, http.MethodPost, "/v1/stripe/webhook", strings.NewReader(body), headers)
+	if first.Code != http.StatusCreated {
+		t.Fatalf("first status = %d, want %d: %s", first.Code, http.StatusCreated, first.Body.String())
+	}
+
+	duplicate := requestWithHeaders(t, srv, http.MethodPost, "/v1/stripe/webhook", strings.NewReader(body), headers)
+	if duplicate.Code != http.StatusOK {
+		t.Fatalf("duplicate status = %d, want %d: %s", duplicate.Code, http.StatusOK, duplicate.Body.String())
+	}
+
+	assertJSONContentType(t, duplicate)
+	assertJSONField(t, duplicate.Body.Bytes(), "duplicate", true)
+	assertJSONField(t, duplicate.Body.Bytes(), "source_event_id", "evt_123")
+	assertNoDecisionFields(t, duplicate.Body.String())
+}
+
+func TestStripeWebhookSignatureFailuresReturn400(t *testing.T) {
+	now := time.Unix(1760000030, 0).UTC()
+	body := stripeEventBodyString("customer.subscription.updated")
+
+	cases := []struct {
+		name      string
+		secret    string
+		header    string
+		wantError string
+	}{
+		{
+			name:      "without configured secret",
+			secret:    "",
+			header:    stripeSignatureHeader(t, "whsec_test", 1760000000, body),
+			wantError: "stripe_webhook_secret_not_configured",
+		},
+		{
+			name:      "missing signature",
+			secret:    "whsec_test",
+			header:    "",
+			wantError: "stripe_signature_header_required",
+		},
+		{
+			name:      "bad timestamp",
+			secret:    "whsec_test",
+			header:    "t=not-a-time,v1=abcd",
+			wantError: "stripe_signature_timestamp_invalid",
+		},
+		{
+			name:      "old timestamp",
+			secret:    "whsec_test",
+			header:    stripeSignatureHeader(t, "whsec_test", 1759999000, body),
+			wantError: "stripe_signature_timestamp_outside_tolerance",
+		},
+		{
+			name:      "missing v1",
+			secret:    "whsec_test",
+			header:    "t=1760000000",
+			wantError: "stripe_signature_v1_required",
+		},
+		{
+			name:      "bad signature",
+			secret:    "whsec_test",
+			header:    stripeSignatureHeader(t, "wrong_secret", 1760000000, body),
+			wantError: "stripe_signature_mismatch",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := newWebhookTestServer(t, now, tc.secret, 300*time.Second)
+
+			rec := requestWithHeaders(t, srv, http.MethodPost, "/v1/stripe/webhook", strings.NewReader(body), map[string]string{
+				"Stripe-Signature": tc.header,
+			})
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want %d: %s", rec.Code, http.StatusBadRequest, rec.Body.String())
+			}
+
+			assertJSONContentType(t, rec)
+			assertJSONField(t, rec.Body.Bytes(), "error", tc.wantError)
+			assertNoDecisionFields(t, rec.Body.String())
+		})
+	}
+}
+
+func TestUnsignedDemoEndpointWorksWithoutWebhookSecret(t *testing.T) {
+	srv := newWebhookTestServer(t, time.Date(2026, 6, 11, 12, 0, 0, 0, time.UTC), "", 300*time.Second)
+
+	rec := request(t, srv, http.MethodPost, "/v1/stripe/events", stripeEventBody("customer.subscription.updated"))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d: %s", rec.Code, http.StatusCreated, rec.Body.String())
+	}
+
+	assertJSONField(t, rec.Body.Bytes(), "source_event_id", "evt_123")
+	assertNoDecisionFields(t, rec.Body.String())
+}
+
 func TestGetMissingCustomerReturns404(t *testing.T) {
 	srv := newTestServer(t, time.Date(2026, 6, 11, 12, 0, 0, 0, time.UTC))
 
@@ -442,6 +574,14 @@ func newTestServer(t *testing.T, now time.Time) *Server {
 	return srv
 }
 
+func newWebhookTestServer(t *testing.T, now time.Time, webhookSecret string, signatureTolerance time.Duration) *Server {
+	t.Helper()
+
+	srv := NewWithStripeConfig(store.NewMemory(), 60*time.Second, webhookSecret, signatureTolerance)
+	srv.now = func() time.Time { return now }
+	return srv
+}
+
 func request(t *testing.T, srv *Server, method string, target string, body *strings.Reader) *httptest.ResponseRecorder {
 	t.Helper()
 
@@ -459,19 +599,47 @@ func request(t *testing.T, srv *Server, method string, target string, body *stri
 	return rec
 }
 
+func requestWithHeaders(t *testing.T, srv *Server, method string, target string, body *strings.Reader, headers map[string]string) *httptest.ResponseRecorder {
+	t.Helper()
+
+	req := httptest.NewRequest(method, target, body)
+	req.Header.Set("Content-Type", "application/json")
+	for name, value := range headers {
+		if value != "" {
+			req.Header.Set(name, value)
+		}
+	}
+
+	rec := httptest.NewRecorder()
+	srv.Routes().ServeHTTP(rec, req)
+	return rec
+}
+
 func validEnvelopeBody(staleAfter string) *strings.Reader {
 	body := `{"source":"stripe","subject":"cus_123","state_type":"subscription","observed_at":"2026-06-11T12:00:00Z","stale_after":"` + staleAfter + `","source_event_id":"evt_123","source_object_id":"sub_123","payload":{"customer_id":"cus_123","subscription_id":"sub_123","status":"active"}}`
 	return strings.NewReader(body)
 }
 
 func stripeEventBody(eventType string) *strings.Reader {
-	body := `{"id":"evt_123","type":"` + eventType + `","created":1760000000,"data":{"object":{"id":"sub_123","object":"subscription","customer":"cus_123","status":"active","current_period_end":1762600000,"cancel_at_period_end":false}}}`
-	return strings.NewReader(body)
+	return strings.NewReader(stripeEventBodyString(eventType))
+}
+
+func stripeEventBodyString(eventType string) string {
+	return `{"id":"evt_123","type":"` + eventType + `","created":1760000000,"data":{"object":{"id":"sub_123","object":"subscription","customer":"cus_123","status":"active","current_period_end":1762600000,"cancel_at_period_end":false}}}`
 }
 
 func stripeEventBodyWithObject(eventID string, subscriptionID string, status string) *strings.Reader {
 	body := `{"id":"` + eventID + `","type":"customer.subscription.updated","created":1760000000,"data":{"object":{"id":"` + subscriptionID + `","object":"subscription","customer":"cus_123","status":"` + status + `","current_period_end":1762600000,"cancel_at_period_end":false}}}`
 	return strings.NewReader(body)
+}
+
+func stripeSignatureHeader(t *testing.T, secret string, timestamp int64, body string) string {
+	t.Helper()
+
+	mac := hmac.New(sha256.New, []byte(secret))
+	_, _ = mac.Write([]byte(fmt.Sprintf("%d.", timestamp)))
+	_, _ = mac.Write([]byte(body))
+	return fmt.Sprintf("t=%d,v1=%s", timestamp, hex.EncodeToString(mac.Sum(nil)))
 }
 
 func assertJSONField(t *testing.T, body []byte, field string, want any) {

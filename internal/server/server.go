@@ -2,9 +2,16 @@ package server
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/mlawrence427/signalrelay/internal/envelope"
@@ -17,9 +24,11 @@ type Store interface {
 }
 
 type Server struct {
-	store                  Store
-	now                    func() time.Time
-	stripeStaleAfterWindow time.Duration
+	store                    Store
+	now                      func() time.Time
+	stripeStaleAfterWindow   time.Duration
+	stripeWebhookSecret      string
+	stripeSignatureTolerance time.Duration
 }
 
 func New(store Store) *Server {
@@ -27,10 +36,16 @@ func New(store Store) *Server {
 }
 
 func NewWithStripeStaleAfter(store Store, staleAfterWindow time.Duration) *Server {
+	return NewWithStripeConfig(store, staleAfterWindow, "", 300*time.Second)
+}
+
+func NewWithStripeConfig(store Store, staleAfterWindow time.Duration, webhookSecret string, signatureTolerance time.Duration) *Server {
 	return &Server{
-		store:                  store,
-		now:                    time.Now,
-		stripeStaleAfterWindow: staleAfterWindow,
+		store:                    store,
+		now:                      time.Now,
+		stripeStaleAfterWindow:   staleAfterWindow,
+		stripeWebhookSecret:      webhookSecret,
+		stripeSignatureTolerance: signatureTolerance,
 	}
 }
 
@@ -39,6 +54,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /healthz", s.handleHealthz)
 	mux.HandleFunc("POST /v1/stripe/subscription-state", s.handlePostSubscriptionState)
 	mux.HandleFunc("POST /v1/stripe/events", s.handlePostStripeEvent)
+	mux.HandleFunc("POST /v1/stripe/webhook", s.handlePostStripeWebhook)
 	mux.HandleFunc("GET /v1/state/stripe/subscription", s.handleGetSubscriptionState)
 	return mux
 }
@@ -94,8 +110,40 @@ type stripeSubscriptionObject struct {
 func (s *Server) handlePostStripeEvent(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
+	rawBody, err := io.ReadAll(r.Body)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+
+	s.ingestStripeEvent(w, rawBody)
+}
+
+func (s *Server) handlePostStripeWebhook(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+
+	if s.stripeWebhookSecret == "" {
+		writeError(w, http.StatusBadRequest, "stripe_webhook_secret_not_configured")
+		return
+	}
+
+	rawBody, err := io.ReadAll(r.Body)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+
+	if err := s.verifyStripeSignature(r.Header.Get("Stripe-Signature"), rawBody); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	s.ingestStripeEvent(w, rawBody)
+}
+
+func (s *Server) ingestStripeEvent(w http.ResponseWriter, rawBody []byte) {
 	var event stripeEvent
-	if err := json.NewDecoder(r.Body).Decode(&event); err != nil {
+	if err := json.Unmarshal(rawBody, &event); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_json")
 		return
 	}
@@ -126,6 +174,73 @@ func (s *Server) handlePostStripeEvent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, env.WithFreshness(s.now()))
+}
+
+func (s *Server) verifyStripeSignature(header string, rawBody []byte) error {
+	if header == "" {
+		return errors.New("stripe_signature_header_required")
+	}
+
+	timestamp, signatures, err := parseStripeSignatureHeader(header)
+	if err != nil {
+		return err
+	}
+
+	signedAt := time.Unix(timestamp, 0)
+	if s.now().Sub(signedAt) > s.stripeSignatureTolerance || signedAt.Sub(s.now()) > s.stripeSignatureTolerance {
+		return errors.New("stripe_signature_timestamp_outside_tolerance")
+	}
+
+	if len(signatures) == 0 {
+		return errors.New("stripe_signature_v1_required")
+	}
+
+	expected := computeStripeSignature(s.stripeWebhookSecret, timestamp, rawBody)
+	for _, signature := range signatures {
+		if signatureBytes, err := hex.DecodeString(signature); err == nil && hmac.Equal(signatureBytes, expected) {
+			return nil
+		}
+	}
+
+	return errors.New("stripe_signature_mismatch")
+}
+
+func parseStripeSignatureHeader(header string) (int64, []string, error) {
+	var timestamp int64
+	var signatures []string
+
+	for _, part := range strings.Split(header, ",") {
+		name, value, ok := strings.Cut(strings.TrimSpace(part), "=")
+		if !ok {
+			continue
+		}
+
+		switch name {
+		case "t":
+			parsed, err := strconv.ParseInt(value, 10, 64)
+			if err != nil || parsed <= 0 {
+				return 0, nil, errors.New("stripe_signature_timestamp_invalid")
+			}
+			timestamp = parsed
+		case "v1":
+			if value != "" {
+				signatures = append(signatures, value)
+			}
+		}
+	}
+
+	if timestamp == 0 {
+		return 0, nil, errors.New("stripe_signature_timestamp_invalid")
+	}
+
+	return timestamp, signatures, nil
+}
+
+func computeStripeSignature(secret string, timestamp int64, rawBody []byte) []byte {
+	mac := hmac.New(sha256.New, []byte(secret))
+	_, _ = mac.Write([]byte(fmt.Sprintf("%d.", timestamp)))
+	_, _ = mac.Write(rawBody)
+	return mac.Sum(nil)
 }
 
 func (s *Server) envelopeFromStripeEvent(event stripeEvent) (envelope.Envelope, error) {

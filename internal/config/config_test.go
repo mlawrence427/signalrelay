@@ -24,6 +24,12 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.StripeStaleAfterSeconds != 300 {
 		t.Fatalf("StripeStaleAfterSeconds = %d, want %d", cfg.StripeStaleAfterSeconds, 300)
 	}
+	if cfg.StripeWebhookSecret != "" {
+		t.Fatalf("StripeWebhookSecret = %q, want empty", cfg.StripeWebhookSecret)
+	}
+	if cfg.StripeSignatureToleranceSeconds != 300 {
+		t.Fatalf("StripeSignatureToleranceSeconds = %d, want %d", cfg.StripeSignatureToleranceSeconds, 300)
+	}
 }
 
 func TestLoadCustomAddr(t *testing.T) {
@@ -110,6 +116,56 @@ func TestLoadInvalidStripeStaleAfterSecondsReturnsError(t *testing.T) {
 			t.Setenv("SIGNALRELAY_STORE", "")
 			t.Setenv("SIGNALRELAY_DB_PATH", "")
 			t.Setenv("SIGNALRELAY_STRIPE_STALE_AFTER_SECONDS", value)
+
+			_, err := Load()
+			if err == nil {
+				t.Fatal("Load() error = nil, want error")
+			}
+		})
+	}
+}
+
+func TestLoadCustomStripeWebhookSecret(t *testing.T) {
+	t.Setenv("SIGNALRELAY_ADDR", "")
+	t.Setenv("SIGNALRELAY_STORE", "")
+	t.Setenv("SIGNALRELAY_DB_PATH", "")
+	t.Setenv("SIGNALRELAY_STRIPE_WEBHOOK_SECRET", "whsec_test")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if cfg.StripeWebhookSecret != "whsec_test" {
+		t.Fatalf("StripeWebhookSecret = %q, want %q", cfg.StripeWebhookSecret, "whsec_test")
+	}
+}
+
+func TestLoadCustomStripeSignatureToleranceSeconds(t *testing.T) {
+	t.Setenv("SIGNALRELAY_ADDR", "")
+	t.Setenv("SIGNALRELAY_STORE", "")
+	t.Setenv("SIGNALRELAY_DB_PATH", "")
+	t.Setenv("SIGNALRELAY_STRIPE_SIGNATURE_TOLERANCE_SECONDS", "60")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if cfg.StripeSignatureToleranceSeconds != 60 {
+		t.Fatalf("StripeSignatureToleranceSeconds = %d, want %d", cfg.StripeSignatureToleranceSeconds, 60)
+	}
+}
+
+func TestLoadInvalidStripeSignatureToleranceSecondsReturnsError(t *testing.T) {
+	cases := []string{"0", "-1", "not-a-number"}
+
+	for _, value := range cases {
+		t.Run(value, func(t *testing.T) {
+			t.Setenv("SIGNALRELAY_ADDR", "")
+			t.Setenv("SIGNALRELAY_STORE", "")
+			t.Setenv("SIGNALRELAY_DB_PATH", "")
+			t.Setenv("SIGNALRELAY_STRIPE_SIGNATURE_TOLERANCE_SECONDS", value)
 
 			_, err := Load()
 			if err == nil {

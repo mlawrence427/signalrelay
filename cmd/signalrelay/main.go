@@ -26,7 +26,12 @@ func main() {
 	}
 	defer closeStore()
 
-	srv := server.NewWithStripeStaleAfter(stateStore, cfg.StripeStaleAfterDuration())
+	srv := server.NewWithStripeConfig(
+		stateStore,
+		cfg.StripeStaleAfterDuration(),
+		cfg.StripeWebhookSecret,
+		cfg.StripeSignatureToleranceDuration(),
+	)
 
 	logStartup(cfg)
 	if err := http.ListenAndServe(cfg.Addr, srv.Routes()); err != nil {

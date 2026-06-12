@@ -7,6 +7,7 @@
 * local HTTP service
 * manual state-envelope POST
 * unsigned demo Stripe-shaped event ingestion
+* signature-verified Stripe webhook endpoint for supported subscription events
 * stricter demo Stripe event validation
 * duplicate demo event protection by `source_event_id`
 * local read API by `customer_id`
@@ -24,7 +25,6 @@
 ### Not implemented
 
 * production webhook handling
-* Stripe signature verification
 * authorization evaluation
 * access decisions
 * policy enforcement

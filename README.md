@@ -6,7 +6,7 @@ It is not production software.
 
 The `POST /v1/stripe/events` endpoint is unsigned demo ingestion only.
 
-Real Stripe webhook signature verification is not implemented yet.
+The `POST /v1/stripe/webhook` endpoint verifies `Stripe-Signature` with a configured local webhook secret before ingesting supported subscription events.
 
 Do not expose the demo ingestion endpoint to the public internet.
 
@@ -23,6 +23,7 @@ SignalRelay currently includes:
 * local HTTP service
 * manual state-envelope POST
 * unsigned demo Stripe-shaped event ingestion
+* signature-verified Stripe webhook ingestion for supported subscription events
 * duplicate demo event protection by `source_event_id`
 * local read API by `customer_id`
 * dynamic freshness computation
@@ -50,7 +51,6 @@ SignalRelay does not:
 * orchestrate workflows
 * retry application actions
 * call Stripe APIs
-* verify Stripe signatures yet
 * expose a production webhook surface
 * replace Stripe as the source of truth
 * integrate with StateMirror yet
@@ -76,6 +76,8 @@ SIGNALRELAY_ADDR=:8080
 SIGNALRELAY_STORE=memory
 SIGNALRELAY_DB_PATH=signalrelay.db
 SIGNALRELAY_STRIPE_STALE_AFTER_SECONDS=300
+SIGNALRELAY_STRIPE_WEBHOOK_SECRET=
+SIGNALRELAY_STRIPE_SIGNATURE_TOLERANCE_SECONDS=300
 ```
 
 To use optional SQLite persistence:
@@ -105,6 +107,7 @@ Available local endpoints:
 * `GET /healthz`
 * `POST /v1/stripe/subscription-state`
 * `POST /v1/stripe/events`
+* `POST /v1/stripe/webhook`
 * `GET /v1/state/stripe/subscription?customer_id=...`
 
 Write a Stripe subscription state envelope:
@@ -134,7 +137,9 @@ Read the local state envelope:
 curl "http://localhost:8080/v1/state/stripe/subscription?customer_id=cus_123"
 ```
 
-The prototype also accepts unsigned demo Stripe-shaped subscription events at `POST /v1/stripe/events`. Real Stripe webhook signature verification is not implemented.
+The prototype accepts unsigned demo Stripe-shaped subscription events at `POST /v1/stripe/events`.
+
+The separate `POST /v1/stripe/webhook` endpoint verifies `Stripe-Signature` with `SIGNALRELAY_STRIPE_WEBHOOK_SECRET` before reusing the same subscription event ingestion path. The secret is required only when calling the verified endpoint.
 
 Repeated demo Stripe events with the same event id are treated as duplicates and do not rewrite the stored envelope. This is duplicate event protection, not workflow retry orchestration.
 

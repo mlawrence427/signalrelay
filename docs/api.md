@@ -4,7 +4,7 @@ This document describes the current local HTTP API for the SignalRelay prototype
 
 The API is limited to storing and reading stale-aware Stripe subscription state envelopes. The default local prototype store is in memory. Optional SQLite persistence can be enabled explicitly with `SIGNALRELAY_STORE=sqlite`.
 
-The API does not verify real Stripe webhook signatures, authenticate requests, or evaluate access.
+The API includes a separate signature-verified Stripe webhook endpoint. It does not authenticate general requests or evaluate access.
 
 ## Local Storage
 
@@ -17,6 +17,8 @@ SIGNALRELAY_ADDR=:8080
 SIGNALRELAY_STORE=memory
 SIGNALRELAY_DB_PATH=signalrelay.db
 SIGNALRELAY_STRIPE_STALE_AFTER_SECONDS=300
+SIGNALRELAY_STRIPE_WEBHOOK_SECRET=
+SIGNALRELAY_STRIPE_SIGNATURE_TOLERANCE_SECONDS=300
 ```
 
 To use optional SQLite persistence:
@@ -90,7 +92,7 @@ Static example payloads are available in `examples/`. Refresh their `observed_at
 
 Accepts an unsigned demo Stripe-shaped event payload and converts supported subscription events into the existing SignalRelay state envelope.
 
-This is demo ingestion only. Real Stripe webhook signature verification is not implemented. The endpoint does not verify `Stripe-Signature`, call the Stripe API, handle secrets, or claim production webhook behavior.
+This is demo ingestion only. This endpoint does not verify `Stripe-Signature`, call the Stripe API, handle secrets, or claim production webhook behavior.
 
 Supported event types:
 
@@ -172,6 +174,44 @@ Duplicate response:
 This is duplicate event protection for the local observed-state store. It is not workflow retry orchestration.
 
 An example event payload is available at `examples/stripe-event-subscription-updated.json`.
+
+## POST /v1/stripe/webhook
+
+Accepts a Stripe-shaped event payload only after verifying the `Stripe-Signature` header with `SIGNALRELAY_STRIPE_WEBHOOK_SECRET`.
+
+The verified endpoint uses the raw request body for verification before parsing JSON. The signature base string is:
+
+```text
+timestamp + "." + raw_body
+```
+
+Verification uses HMAC SHA-256 and the `v1` signature from the `Stripe-Signature` header.
+
+`SIGNALRELAY_STRIPE_WEBHOOK_SECRET` is required when calling this endpoint. The secret is not required at startup.
+
+`SIGNALRELAY_STRIPE_SIGNATURE_TOLERANCE_SECONDS` defaults to `300` and must be a positive integer. Invalid values fail startup.
+
+After verification, this endpoint reuses the same subscription event ingestion path as `POST /v1/stripe/events`:
+
+* same supported event types
+* same event-shape validation
+* same envelope mapping
+* same duplicate event handling by `source_event_id`
+* same memory and SQLite behavior
+* same freshness computation
+
+The response is the stored envelope response, or the duplicate event response when the event id has already been ingested. Responses never include `allowed` or `denied`.
+
+Signature verification errors return HTTP 400 with JSON error bodies:
+
+* `stripe_webhook_secret_not_configured`
+* `stripe_signature_header_required`
+* `stripe_signature_timestamp_invalid`
+* `stripe_signature_timestamp_outside_tolerance`
+* `stripe_signature_v1_required`
+* `stripe_signature_mismatch`
+
+This endpoint verifies the local webhook signature for this prototype. It does not call Stripe APIs, enforce policy, decide access, or make SignalRelay production software.
 
 ## GET /v1/state/stripe/subscription?customer_id=cus_123
 
