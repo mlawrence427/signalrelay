@@ -38,6 +38,10 @@ Available local endpoints:
 * `POST /v1/stripe/subscription-state`
 * `GET /v1/state/stripe/subscription?customer_id=...`
 
+API contract:
+
+* [Local API](docs/api.md)
+
 Write a Stripe subscription state envelope:
 
 ```bash
