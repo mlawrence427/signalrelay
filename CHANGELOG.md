@@ -20,6 +20,8 @@
 * local signed webhook smoke test
 * prototype release checklist
 * local release build helper script
+* StateMirror integration example documentation
+* StateMirror-style premium access snapshot example
 * Dockerfile and `.dockerignore` for local container builds
 * operations and security hardening checklist
 * Docker validation documentation

@@ -38,6 +38,7 @@ SignalRelay currently includes:
 * [Local API](docs/api.md)
 * [Operations and security hardening checklist](docs/operations-security.md)
 * [Prototype release checklist](docs/release-checklist.md)
+* [StateMirror integration example](docs/statemirror-integration.md)
 * [Docker validation](docs/docker.md)
 * [Stripe CLI validation](docs/stripe-cli.md)
 * [Local signed webhook smoke test](docs/local-signed-webhook.md)
@@ -197,6 +198,10 @@ docker run --rm -p 8080:8080 `
 ## Examples and smoke tests
 
 The `examples/` directory includes static Stripe subscription envelopes. Refresh `observed_at` and `stale_after` if you need an example response to report `fresh`.
+
+StateMirror-style example:
+
+* [Premium access snapshot](examples/statemirror-premium-access-snapshot.json)
 
 Memory mode:
 

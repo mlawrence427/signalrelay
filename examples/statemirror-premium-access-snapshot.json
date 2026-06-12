@@ -1,0 +1,36 @@
+{
+  "snapshot_type": "premium_access.check",
+  "subject": "cus_123",
+  "captured_at": "2026-06-12T18:00:00Z",
+  "decision": {
+    "allowed": false,
+    "reason": "stripe_subscription_active_but_stale",
+    "decided_by": "application"
+  },
+  "evidence": {
+    "signalrelay": {
+      "source": "stripe",
+      "subject": "cus_123",
+      "state_type": "stripe.subscription",
+      "observed_at": "2026-06-12T17:45:00Z",
+      "stale_after": "2026-06-12T17:50:00Z",
+      "freshness": "stale",
+      "source_event_id": "evt_signalrelay_demo_active",
+      "source_object_id": "sub_signalrelay_demo",
+      "payload_hash": "sha256:example_payload_hash",
+      "payload": {
+        "id": "sub_signalrelay_demo",
+        "object": "subscription",
+        "customer": "cus_123",
+        "status": "active",
+        "current_period_end": 1762600000,
+        "cancel_at_period_end": false
+      }
+    }
+  },
+  "boundary": {
+    "signalrelay_role": "observed external state",
+    "application_role": "decision owner",
+    "statemirror_role": "decision evidence recorder"
+  }
+}
