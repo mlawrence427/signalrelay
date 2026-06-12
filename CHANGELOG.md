@@ -32,6 +32,7 @@
 * API contract documentation
 * prototype checkpoint documentation
 * Prototype Checkpoint 3 documentation
+* Prototype Checkpoint 4 readiness documentation
 
 ### Not implemented
 

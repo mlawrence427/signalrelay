@@ -46,6 +46,7 @@ SignalRelay currently includes:
 * [Prototype checkpoint](docs/checkpoints/prototype-1.md)
 * [Prototype checkpoint 2](docs/checkpoints/prototype-2.md)
 * [Prototype checkpoint 3](docs/checkpoints/prototype-3.md)
+* [Prototype checkpoint 4](docs/checkpoints/prototype-4.md)
 
 ## Non-capabilities
 
