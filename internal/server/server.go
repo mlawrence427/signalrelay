@@ -16,14 +16,20 @@ type Store interface {
 }
 
 type Server struct {
-	store Store
-	now   func() time.Time
+	store                  Store
+	now                    func() time.Time
+	stripeStaleAfterWindow time.Duration
 }
 
 func New(store Store) *Server {
+	return NewWithStripeStaleAfter(store, 300*time.Second)
+}
+
+func NewWithStripeStaleAfter(store Store, staleAfterWindow time.Duration) *Server {
 	return &Server{
-		store: store,
-		now:   time.Now,
+		store:                  store,
+		now:                    time.Now,
+		stripeStaleAfterWindow: staleAfterWindow,
 	}
 }
 
@@ -31,6 +37,7 @@ func (s *Server) Routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.handleHealthz)
 	mux.HandleFunc("POST /v1/stripe/subscription-state", s.handlePostSubscriptionState)
+	mux.HandleFunc("POST /v1/stripe/events", s.handlePostStripeEvent)
 	mux.HandleFunc("GET /v1/state/stripe/subscription", s.handleGetSubscriptionState)
 	return mux
 }
@@ -65,6 +72,74 @@ func (s *Server) handlePostSubscriptionState(w http.ResponseWriter, r *http.Requ
 	}
 
 	writeJSON(w, http.StatusCreated, env.WithFreshness(s.now()))
+}
+
+type stripeEvent struct {
+	ID      string `json:"id"`
+	Type    string `json:"type"`
+	Created int64  `json:"created"`
+	Data    struct {
+		Object json.RawMessage `json:"object"`
+	} `json:"data"`
+}
+
+type stripeSubscriptionObject struct {
+	ID       string `json:"id"`
+	Object   string `json:"object"`
+	Customer string `json:"customer"`
+}
+
+func (s *Server) handlePostStripeEvent(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+
+	var event stripeEvent
+	if err := json.NewDecoder(r.Body).Decode(&event); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_json")
+		return
+	}
+
+	env, err := s.envelopeFromStripeEvent(event)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if err := s.store.Put(env); err != nil {
+		writeError(w, http.StatusInternalServerError, "store_write_failed")
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, env.WithFreshness(s.now()))
+}
+
+func (s *Server) envelopeFromStripeEvent(event stripeEvent) (envelope.Envelope, error) {
+	if err := validateStripeEvent(event); err != nil {
+		return envelope.Envelope{}, err
+	}
+
+	var subscription stripeSubscriptionObject
+	if err := json.Unmarshal(event.Data.Object, &subscription); err != nil {
+		return envelope.Envelope{}, errors.New("stripe_event_object_invalid")
+	}
+	if subscription.Customer == "" {
+		return envelope.Envelope{}, errors.New("stripe_subscription_customer_required")
+	}
+	if subscription.ID == "" {
+		return envelope.Envelope{}, errors.New("stripe_subscription_id_required")
+	}
+
+	observedAt := time.Unix(event.Created, 0).UTC()
+	return envelope.Envelope{
+		Source:         "stripe",
+		Subject:        subscription.Customer,
+		StateType:      "stripe.subscription",
+		ObservedAt:     observedAt,
+		StaleAfter:     observedAt.Add(s.stripeStaleAfterWindow),
+		SourceEventID:  event.ID,
+		SourceObjectID: subscription.ID,
+		PayloadHash:    envelope.HashPayload(event.Data.Object),
+		Payload:        event.Data.Object,
+	}, nil
 }
 
 func (s *Server) handleGetSubscriptionState(w http.ResponseWriter, r *http.Request) {
@@ -111,6 +186,34 @@ func validateInput(input envelope.Input) error {
 		return errors.New("payload_required")
 	default:
 		return nil
+	}
+}
+
+func validateStripeEvent(event stripeEvent) error {
+	switch {
+	case event.ID == "":
+		return errors.New("stripe_event_id_required")
+	case event.Type == "":
+		return errors.New("stripe_event_type_required")
+	case !supportedStripeSubscriptionEvent(event.Type):
+		return errors.New("unsupported_stripe_event_type")
+	case event.Created == 0:
+		return errors.New("stripe_event_created_required")
+	case len(event.Data.Object) == 0 || bytes.Equal(bytes.TrimSpace(event.Data.Object), []byte("null")):
+		return errors.New("stripe_event_object_required")
+	default:
+		return nil
+	}
+}
+
+func supportedStripeSubscriptionEvent(eventType string) bool {
+	switch eventType {
+	case "customer.subscription.created",
+		"customer.subscription.updated",
+		"customer.subscription.deleted":
+		return true
+	default:
+		return false
 	}
 }
 

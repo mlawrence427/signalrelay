@@ -40,6 +40,7 @@ Runtime configuration:
 SIGNALRELAY_ADDR=:8080
 SIGNALRELAY_STORE=memory
 SIGNALRELAY_DB_PATH=signalrelay.db
+SIGNALRELAY_STRIPE_STALE_AFTER_SECONDS=300
 ```
 
 To use optional SQLite persistence:
@@ -61,6 +62,7 @@ Available local endpoints:
 
 * `GET /healthz`
 * `POST /v1/stripe/subscription-state`
+* `POST /v1/stripe/events`
 * `GET /v1/state/stripe/subscription?customer_id=...`
 
 API contract:
@@ -93,6 +95,8 @@ Read the local state envelope:
 ```bash
 curl "http://localhost:8080/v1/state/stripe/subscription?customer_id=cus_123"
 ```
+
+The prototype also accepts unsigned demo Stripe-shaped subscription events at `POST /v1/stripe/events`. Real Stripe webhook signature verification is not implemented.
 
 ## Examples and smoke tests
 

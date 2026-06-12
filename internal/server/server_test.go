@@ -129,6 +129,141 @@ func TestGetComputesFreshnessFromSQLiteStoredEnvelope(t *testing.T) {
 	assertNoDecisionFields(t, get.Body.String())
 }
 
+func TestStripeEventUpdatedStoresEnvelope(t *testing.T) {
+	now := time.Date(2026, 6, 11, 12, 0, 0, 0, time.UTC)
+	srv := NewWithStripeStaleAfter(store.NewMemory(), 60*time.Second)
+	srv.now = func() time.Time { return now }
+
+	rec := request(t, srv, http.MethodPost, "/v1/stripe/events", stripeEventBody("customer.subscription.updated"))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d: %s", rec.Code, http.StatusCreated, rec.Body.String())
+	}
+
+	assertJSONContentType(t, rec)
+	assertJSONField(t, rec.Body.Bytes(), "source", "stripe")
+	assertJSONField(t, rec.Body.Bytes(), "subject", "cus_123")
+	assertJSONField(t, rec.Body.Bytes(), "state_type", "stripe.subscription")
+	assertJSONField(t, rec.Body.Bytes(), "source_event_id", "evt_123")
+	assertJSONField(t, rec.Body.Bytes(), "source_object_id", "sub_123")
+	assertJSONField(t, rec.Body.Bytes(), "freshness", "stale")
+	assertNoDecisionFields(t, rec.Body.String())
+}
+
+func TestGetReturnsEnvelopeStoredFromStripeEvent(t *testing.T) {
+	now := time.Date(2026, 6, 11, 12, 0, 0, 0, time.UTC)
+	srv := NewWithStripeStaleAfter(store.NewMemory(), 60*time.Second)
+	srv.now = func() time.Time { return now }
+
+	request(t, srv, http.MethodPost, "/v1/stripe/events", stripeEventBody("customer.subscription.updated"))
+
+	get := request(t, srv, http.MethodGet, "/v1/state/stripe/subscription?customer_id=cus_123", nil)
+	if get.Code != http.StatusOK {
+		t.Fatalf("GET status = %d, want %d: %s", get.Code, http.StatusOK, get.Body.String())
+	}
+
+	assertJSONContentType(t, get)
+	assertJSONField(t, get.Body.Bytes(), "subject", "cus_123")
+	assertJSONField(t, get.Body.Bytes(), "state_type", "stripe.subscription")
+	assertJSONField(t, get.Body.Bytes(), "source_event_id", "evt_123")
+	assertJSONField(t, get.Body.Bytes(), "source_object_id", "sub_123")
+	assertNoDecisionFields(t, get.Body.String())
+}
+
+func TestStripeEventCreatedAndDeletedAreAccepted(t *testing.T) {
+	for _, eventType := range []string{"customer.subscription.created", "customer.subscription.deleted"} {
+		t.Run(eventType, func(t *testing.T) {
+			srv := newTestServer(t, time.Date(2026, 6, 11, 12, 0, 0, 0, time.UTC))
+
+			rec := request(t, srv, http.MethodPost, "/v1/stripe/events", stripeEventBody(eventType))
+			if rec.Code != http.StatusCreated {
+				t.Fatalf("status = %d, want %d: %s", rec.Code, http.StatusCreated, rec.Body.String())
+			}
+			assertNoDecisionFields(t, rec.Body.String())
+		})
+	}
+}
+
+func TestUnsupportedStripeEventTypeReturns400(t *testing.T) {
+	srv := newTestServer(t, time.Date(2026, 6, 11, 12, 0, 0, 0, time.UTC))
+
+	rec := request(t, srv, http.MethodPost, "/v1/stripe/events", stripeEventBody("invoice.created"))
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d: %s", rec.Code, http.StatusBadRequest, rec.Body.String())
+	}
+
+	assertJSONField(t, rec.Body.Bytes(), "error", "unsupported_stripe_event_type")
+	assertNoDecisionFields(t, rec.Body.String())
+}
+
+func TestStripeEventMissingFieldsReturn400(t *testing.T) {
+	cases := []struct {
+		name      string
+		body      string
+		wantError string
+	}{
+		{
+			name:      "missing event id",
+			body:      `{"type":"customer.subscription.updated","created":1760000000,"data":{"object":{"id":"sub_123","object":"subscription","customer":"cus_123","status":"active"}}}`,
+			wantError: "stripe_event_id_required",
+		},
+		{
+			name:      "missing customer",
+			body:      `{"id":"evt_123","type":"customer.subscription.updated","created":1760000000,"data":{"object":{"id":"sub_123","object":"subscription","status":"active"}}}`,
+			wantError: "stripe_subscription_customer_required",
+		},
+		{
+			name:      "missing object id",
+			body:      `{"id":"evt_123","type":"customer.subscription.updated","created":1760000000,"data":{"object":{"object":"subscription","customer":"cus_123","status":"active"}}}`,
+			wantError: "stripe_subscription_id_required",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := newTestServer(t, time.Date(2026, 6, 11, 12, 0, 0, 0, time.UTC))
+
+			rec := request(t, srv, http.MethodPost, "/v1/stripe/events", strings.NewReader(tc.body))
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want %d: %s", rec.Code, http.StatusBadRequest, rec.Body.String())
+			}
+
+			assertJSONField(t, rec.Body.Bytes(), "error", tc.wantError)
+			assertNoDecisionFields(t, rec.Body.String())
+		})
+	}
+}
+
+func TestStripeEventFreshnessUsesConfiguredStaleAfterSeconds(t *testing.T) {
+	now := time.Unix(1760000030, 0).UTC()
+	srv := NewWithStripeStaleAfter(store.NewMemory(), 60*time.Second)
+	srv.now = func() time.Time { return now }
+
+	rec := request(t, srv, http.MethodPost, "/v1/stripe/events", stripeEventBody("customer.subscription.updated"))
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d: %s", rec.Code, http.StatusCreated, rec.Body.String())
+	}
+
+	var got map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("response is not JSON: %v", err)
+	}
+
+	observedAt, err := time.Parse(time.RFC3339, got["observed_at"].(string))
+	if err != nil {
+		t.Fatalf("observed_at parse error = %v", err)
+	}
+	staleAfter, err := time.Parse(time.RFC3339, got["stale_after"].(string))
+	if err != nil {
+		t.Fatalf("stale_after parse error = %v", err)
+	}
+
+	if !staleAfter.Equal(observedAt.Add(60 * time.Second)) {
+		t.Fatalf("stale_after = %s, want %s", staleAfter, observedAt.Add(60*time.Second))
+	}
+	assertJSONField(t, rec.Body.Bytes(), "freshness", "fresh")
+	assertNoDecisionFields(t, rec.Body.String())
+}
+
 func TestGetMissingCustomerReturns404(t *testing.T) {
 	srv := newTestServer(t, time.Date(2026, 6, 11, 12, 0, 0, 0, time.UTC))
 
@@ -238,6 +373,11 @@ func request(t *testing.T, srv *Server, method string, target string, body *stri
 
 func validEnvelopeBody(staleAfter string) *strings.Reader {
 	body := `{"source":"stripe","subject":"cus_123","state_type":"subscription","observed_at":"2026-06-11T12:00:00Z","stale_after":"` + staleAfter + `","source_event_id":"evt_123","source_object_id":"sub_123","payload":{"customer_id":"cus_123","subscription_id":"sub_123","status":"active"}}`
+	return strings.NewReader(body)
+}
+
+func stripeEventBody(eventType string) *strings.Reader {
+	body := `{"id":"evt_123","type":"` + eventType + `","created":1760000000,"data":{"object":{"id":"sub_123","object":"subscription","customer":"cus_123","status":"active","current_period_end":1762600000,"cancel_at_period_end":false}}}`
 	return strings.NewReader(body)
 }
 

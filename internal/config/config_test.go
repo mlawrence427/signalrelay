@@ -21,6 +21,9 @@ func TestLoadDefaults(t *testing.T) {
 	if cfg.DBPath != "signalrelay.db" {
 		t.Fatalf("DBPath = %q, want %q", cfg.DBPath, "signalrelay.db")
 	}
+	if cfg.StripeStaleAfterSeconds != 300 {
+		t.Fatalf("StripeStaleAfterSeconds = %d, want %d", cfg.StripeStaleAfterSeconds, 300)
+	}
 }
 
 func TestLoadCustomAddr(t *testing.T) {
@@ -79,5 +82,39 @@ func TestLoadUnknownStoreReturnsError(t *testing.T) {
 	_, err := Load()
 	if err == nil {
 		t.Fatal("Load() error = nil, want error")
+	}
+}
+
+func TestLoadCustomStripeStaleAfterSeconds(t *testing.T) {
+	t.Setenv("SIGNALRELAY_ADDR", "")
+	t.Setenv("SIGNALRELAY_STORE", "")
+	t.Setenv("SIGNALRELAY_DB_PATH", "")
+	t.Setenv("SIGNALRELAY_STRIPE_STALE_AFTER_SECONDS", "60")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if cfg.StripeStaleAfterSeconds != 60 {
+		t.Fatalf("StripeStaleAfterSeconds = %d, want %d", cfg.StripeStaleAfterSeconds, 60)
+	}
+}
+
+func TestLoadInvalidStripeStaleAfterSecondsReturnsError(t *testing.T) {
+	cases := []string{"0", "-1", "not-a-number"}
+
+	for _, value := range cases {
+		t.Run(value, func(t *testing.T) {
+			t.Setenv("SIGNALRELAY_ADDR", "")
+			t.Setenv("SIGNALRELAY_STORE", "")
+			t.Setenv("SIGNALRELAY_DB_PATH", "")
+			t.Setenv("SIGNALRELAY_STRIPE_STALE_AFTER_SECONDS", value)
+
+			_, err := Load()
+			if err == nil {
+				t.Fatal("Load() error = nil, want error")
+			}
+		})
 	}
 }

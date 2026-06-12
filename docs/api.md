@@ -16,6 +16,7 @@ Runtime configuration:
 SIGNALRELAY_ADDR=:8080
 SIGNALRELAY_STORE=memory
 SIGNALRELAY_DB_PATH=signalrelay.db
+SIGNALRELAY_STRIPE_STALE_AFTER_SECONDS=300
 ```
 
 To use optional SQLite persistence:
@@ -84,6 +85,62 @@ Example request:
 ```
 
 Static example payloads are available in `examples/`. Refresh their `observed_at` and `stale_after` values if you need a response to report `fresh`.
+
+## POST /v1/stripe/events
+
+Accepts an unsigned demo Stripe-shaped event payload and converts supported subscription events into the existing SignalRelay state envelope.
+
+This is demo ingestion only. Real Stripe webhook signature verification is not implemented. The endpoint does not verify `Stripe-Signature`, call the Stripe API, handle secrets, or claim production webhook behavior.
+
+Supported event types:
+
+* `customer.subscription.created`
+* `customer.subscription.updated`
+* `customer.subscription.deleted`
+
+Unsupported event types return HTTP 400:
+
+```json
+{ "error": "unsupported_stripe_event_type" }
+```
+
+Simplified event shape:
+
+```json
+{
+  "id": "evt_123",
+  "type": "customer.subscription.updated",
+  "created": 1760000000,
+  "data": {
+    "object": {
+      "id": "sub_123",
+      "object": "subscription",
+      "customer": "cus_123",
+      "status": "active",
+      "current_period_end": 1762600000,
+      "cancel_at_period_end": false
+    }
+  }
+}
+```
+
+Mapping:
+
+* `source` is `stripe`
+* `subject` is `data.object.customer`
+* `state_type` is `stripe.subscription`
+* `observed_at` is `created` converted from Unix seconds to RFC3339 time
+* `stale_after` is `observed_at` plus `SIGNALRELAY_STRIPE_STALE_AFTER_SECONDS`
+* `source_event_id` is `id`
+* `source_object_id` is `data.object.id`
+* `payload` is the raw `data.object` JSON
+* `payload_hash` is computed from the raw `data.object` JSON
+
+`SIGNALRELAY_STRIPE_STALE_AFTER_SECONDS` defaults to `300` and must be a positive integer. Invalid values fail startup.
+
+The response is the stored envelope response. It never includes `allowed` or `denied`.
+
+An example event payload is available at `examples/stripe-event-subscription-updated.json`.
 
 ## GET /v1/state/stripe/subscription?customer_id=cus_123
 
