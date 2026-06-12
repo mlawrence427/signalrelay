@@ -38,6 +38,7 @@ SignalRelay currently includes:
 * [Local API](docs/api.md)
 * [Docker validation](docs/docker.md)
 * [Stripe CLI validation](docs/stripe-cli.md)
+* [Local signed webhook smoke test](docs/local-signed-webhook.md)
 * [Prototype checkpoint](docs/checkpoints/prototype-1.md)
 * [Prototype checkpoint 2](docs/checkpoints/prototype-2.md)
 * [Prototype checkpoint 3](docs/checkpoints/prototype-3.md)

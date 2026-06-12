@@ -17,6 +17,7 @@
 * runtime configuration
 * CLI inspection flags
 * examples and PowerShell smoke tests
+* local signed webhook smoke test
 * Dockerfile and `.dockerignore` for local container builds
 * Docker validation documentation
 * Stripe CLI validation documentation
