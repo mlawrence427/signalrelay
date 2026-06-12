@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -52,7 +53,12 @@ func (s *Server) handlePostSubscriptionState(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	env := envelope.FromInput(input)
+	env, err := envelope.FromInput(input)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_envelope")
+		return
+	}
+
 	s.store.Put(env)
 
 	writeJSON(w, http.StatusCreated, env.WithFreshness(s.now()))
@@ -82,19 +88,28 @@ func validateInput(input envelope.Input) error {
 		return errors.New("subject_required")
 	case input.StateType == "":
 		return errors.New("state_type_required")
-	case input.ObservedAt.IsZero():
+	case input.ObservedAt == "":
 		return errors.New("observed_at_required")
-	case input.StaleAfter.IsZero():
+	case !validTimestamp(input.ObservedAt):
+		return errors.New("observed_at_invalid")
+	case input.StaleAfter == "":
 		return errors.New("stale_after_required")
+	case !validTimestamp(input.StaleAfter):
+		return errors.New("stale_after_invalid")
 	case input.SourceEventID == "":
 		return errors.New("source_event_id_required")
 	case input.SourceObjectID == "":
 		return errors.New("source_object_id_required")
-	case len(input.Payload) == 0:
+	case len(input.Payload) == 0 || bytes.Equal(bytes.TrimSpace(input.Payload), []byte("null")):
 		return errors.New("payload_required")
 	default:
 		return nil
 	}
+}
+
+func validTimestamp(value string) bool {
+	_, err := time.Parse(time.RFC3339, value)
+	return err == nil
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {

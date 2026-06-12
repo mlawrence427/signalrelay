@@ -11,8 +11,8 @@ type Input struct {
 	Source         string          `json:"source"`
 	Subject        string          `json:"subject"`
 	StateType      string          `json:"state_type"`
-	ObservedAt     time.Time       `json:"observed_at"`
-	StaleAfter     time.Time       `json:"stale_after"`
+	ObservedAt     string          `json:"observed_at"`
+	StaleAfter     string          `json:"stale_after"`
 	SourceEventID  string          `json:"source_event_id"`
 	SourceObjectID string          `json:"source_object_id"`
 	Payload        json.RawMessage `json:"payload"`
@@ -31,18 +31,28 @@ type Envelope struct {
 	Payload        json.RawMessage `json:"payload"`
 }
 
-func FromInput(input Input) Envelope {
+func FromInput(input Input) (Envelope, error) {
+	observedAt, err := time.Parse(time.RFC3339, input.ObservedAt)
+	if err != nil {
+		return Envelope{}, err
+	}
+
+	staleAfter, err := time.Parse(time.RFC3339, input.StaleAfter)
+	if err != nil {
+		return Envelope{}, err
+	}
+
 	return Envelope{
 		Source:         input.Source,
 		Subject:        input.Subject,
 		StateType:      input.StateType,
-		ObservedAt:     input.ObservedAt,
-		StaleAfter:     input.StaleAfter,
+		ObservedAt:     observedAt,
+		StaleAfter:     staleAfter,
 		SourceEventID:  input.SourceEventID,
 		SourceObjectID: input.SourceObjectID,
 		PayloadHash:    HashPayload(input.Payload),
 		Payload:        input.Payload,
-	}
+	}, nil
 }
 
 func HashPayload(payload json.RawMessage) string {
