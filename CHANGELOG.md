@@ -24,6 +24,7 @@
 * StateMirror-style premium access snapshot example
 * production deployment boundary guide
 * Dockerfile and `.dockerignore` for local container builds
+* Docker validation script
 * operations and security hardening checklist
 * Docker validation documentation
 * Stripe CLI validation documentation

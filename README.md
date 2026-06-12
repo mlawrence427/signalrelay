@@ -164,6 +164,12 @@ Container support is for local prototype usage.
 
 The demo Stripe ingestion endpoint remains unsigned. Do not expose the demo ingestion endpoint publicly.
 
+Docker validation is documented in [Docker validation](docs/docker.md). The local validation script is:
+
+```powershell
+.\scripts\validate-docker.ps1
+```
+
 Build:
 
 ```bash

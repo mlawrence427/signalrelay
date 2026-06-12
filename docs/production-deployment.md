@@ -8,7 +8,7 @@ SignalRelay is still an early prototype. This guide explains what would need to 
 * local signed webhook smoke test passes
 * memory and SQLite modes exist
 * Dockerfile exists
-* Docker validation is documented but not yet manually completed
+* Docker validation is documented and scripted, but must be run in the local environment before release
 * Stripe CLI live forwarding is documented but not yet manually completed
 * no official release/tag exists yet
 

@@ -10,16 +10,28 @@ The Dockerfile is intended for local prototype validation. It does not make Sign
 docker build -t signalrelay:local .
 ```
 
+## Validate
+
+Run the local validation script:
+
+```powershell
+.\scripts\validate-docker.ps1
+```
+
+The script builds `signalrelay:local`, starts a memory-mode container, binds the published port to `127.0.0.1`, calls `http://127.0.0.1:8080/healthz`, and stops the container at the end.
+
+If Docker is unavailable, the script fails with a clear message.
+
 ## Run memory mode
 
 ```bash
-docker run --rm -p 8080:8080 signalrelay:local
+docker run --rm -p 127.0.0.1:8080:8080 signalrelay:local
 ```
 
 Then verify:
 
 ```bash
-curl http://localhost:8080/healthz
+curl http://127.0.0.1:8080/healthz
 ```
 
 Expected:
@@ -33,7 +45,7 @@ Expected:
 Use a mounted Docker volume:
 
 ```bash
-docker run --rm -p 8080:8080 \
+docker run --rm -p 127.0.0.1:8080:8080 \
   -e SIGNALRELAY_STORE=sqlite \
   -e SIGNALRELAY_DB_PATH=/data/signalrelay.db \
   -v signalrelay-data:/data \
@@ -43,7 +55,7 @@ docker run --rm -p 8080:8080 \
 PowerShell version:
 
 ```powershell
-docker run --rm -p 8080:8080 `
+docker run --rm -p 127.0.0.1:8080:8080 `
   -e SIGNALRELAY_STORE=sqlite `
   -e SIGNALRELAY_DB_PATH=/data/signalrelay.db `
   -v signalrelay-data:/data `
@@ -62,6 +74,7 @@ The existing PowerShell smoke scripts can be run from the host after the contain
 ## Boundaries
 
 * The demo Stripe ingestion endpoint remains unsigned.
-* Real Stripe signature verification is not implemented yet.
 * Do not expose the demo ingestion endpoint publicly.
+* The verified webhook endpoint requires Stripe-Signature verification.
 * Container support is for local prototype usage only.
+* Docker support does not make SignalRelay production-ready.
