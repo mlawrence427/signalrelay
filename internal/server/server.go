@@ -76,9 +76,9 @@ func (s *Server) handlePostSubscriptionState(w http.ResponseWriter, r *http.Requ
 }
 
 type stripeEvent struct {
-	ID      string `json:"id"`
-	Type    string `json:"type"`
-	Created int64  `json:"created"`
+	ID      string          `json:"id"`
+	Type    string          `json:"type"`
+	Created json.RawMessage `json:"created"`
 	Data    struct {
 		Object json.RawMessage `json:"object"`
 	} `json:"data"`
@@ -88,6 +88,7 @@ type stripeSubscriptionObject struct {
 	ID       string `json:"id"`
 	Object   string `json:"object"`
 	Customer string `json:"customer"`
+	Status   string `json:"status"`
 }
 
 func (s *Server) handlePostStripeEvent(w http.ResponseWriter, r *http.Request) {
@@ -132,9 +133,20 @@ func (s *Server) envelopeFromStripeEvent(event stripeEvent) (envelope.Envelope, 
 		return envelope.Envelope{}, err
 	}
 
+	created, err := parseStripeEventCreated(event.Created)
+	if err != nil {
+		return envelope.Envelope{}, err
+	}
+
 	var subscription stripeSubscriptionObject
 	if err := json.Unmarshal(event.Data.Object, &subscription); err != nil {
 		return envelope.Envelope{}, errors.New("stripe_event_object_invalid")
+	}
+	if subscription.Object == "" {
+		return envelope.Envelope{}, errors.New("stripe_subscription_object_required")
+	}
+	if subscription.Object != "subscription" {
+		return envelope.Envelope{}, errors.New("stripe_subscription_object_invalid")
 	}
 	if subscription.Customer == "" {
 		return envelope.Envelope{}, errors.New("stripe_subscription_customer_required")
@@ -142,8 +154,11 @@ func (s *Server) envelopeFromStripeEvent(event stripeEvent) (envelope.Envelope, 
 	if subscription.ID == "" {
 		return envelope.Envelope{}, errors.New("stripe_subscription_id_required")
 	}
+	if subscription.Status == "" {
+		return envelope.Envelope{}, errors.New("stripe_subscription_status_required")
+	}
 
-	observedAt := time.Unix(event.Created, 0).UTC()
+	observedAt := time.Unix(created, 0).UTC()
 	return envelope.Envelope{
 		Source:         "stripe",
 		Subject:        subscription.Customer,
@@ -212,13 +227,24 @@ func validateStripeEvent(event stripeEvent) error {
 		return errors.New("stripe_event_type_required")
 	case !supportedStripeSubscriptionEvent(event.Type):
 		return errors.New("unsupported_stripe_event_type")
-	case event.Created == 0:
+	case len(event.Created) == 0 || bytes.Equal(bytes.TrimSpace(event.Created), []byte("null")):
 		return errors.New("stripe_event_created_required")
 	case len(event.Data.Object) == 0 || bytes.Equal(bytes.TrimSpace(event.Data.Object), []byte("null")):
 		return errors.New("stripe_event_object_required")
 	default:
 		return nil
 	}
+}
+
+func parseStripeEventCreated(value json.RawMessage) (int64, error) {
+	var created int64
+	if err := json.Unmarshal(value, &created); err != nil {
+		return 0, errors.New("stripe_event_created_invalid")
+	}
+	if created <= 0 {
+		return 0, errors.New("stripe_event_created_invalid")
+	}
+	return created, nil
 }
 
 func supportedStripeSubscriptionEvent(eventType string) bool {

@@ -124,6 +124,21 @@ Simplified event shape:
 }
 ```
 
+Required simplified event fields:
+
+* `id`
+* `type`
+* `created`
+* `data.object`
+* `data.object.object`
+* `data.object.id`
+* `data.object.customer`
+* `data.object.status`
+
+`created` must be a positive Unix timestamp in seconds.
+
+`data.object.object` must be `subscription`.
+
 Mapping:
 
 * `source` is `stripe`

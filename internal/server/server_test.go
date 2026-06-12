@@ -259,6 +259,51 @@ func TestStripeEventMissingFieldsReturn400(t *testing.T) {
 			body:      `{"id":"evt_123","type":"customer.subscription.updated","created":1760000000,"data":{"object":{"object":"subscription","customer":"cus_123","status":"active"}}}`,
 			wantError: "stripe_subscription_id_required",
 		},
+		{
+			name:      "missing event type",
+			body:      `{"id":"evt_123","created":1760000000,"data":{"object":{"id":"sub_123","object":"subscription","customer":"cus_123","status":"active"}}}`,
+			wantError: "stripe_event_type_required",
+		},
+		{
+			name:      "missing created",
+			body:      `{"id":"evt_123","type":"customer.subscription.updated","data":{"object":{"id":"sub_123","object":"subscription","customer":"cus_123","status":"active"}}}`,
+			wantError: "stripe_event_created_required",
+		},
+		{
+			name:      "zero created",
+			body:      `{"id":"evt_123","type":"customer.subscription.updated","created":0,"data":{"object":{"id":"sub_123","object":"subscription","customer":"cus_123","status":"active"}}}`,
+			wantError: "stripe_event_created_invalid",
+		},
+		{
+			name:      "negative created",
+			body:      `{"id":"evt_123","type":"customer.subscription.updated","created":-1,"data":{"object":{"id":"sub_123","object":"subscription","customer":"cus_123","status":"active"}}}`,
+			wantError: "stripe_event_created_invalid",
+		},
+		{
+			name:      "invalid created",
+			body:      `{"id":"evt_123","type":"customer.subscription.updated","created":"not-a-number","data":{"object":{"id":"sub_123","object":"subscription","customer":"cus_123","status":"active"}}}`,
+			wantError: "stripe_event_created_invalid",
+		},
+		{
+			name:      "missing data object",
+			body:      `{"id":"evt_123","type":"customer.subscription.updated","created":1760000000,"data":{}}`,
+			wantError: "stripe_event_object_required",
+		},
+		{
+			name:      "missing subscription object discriminator",
+			body:      `{"id":"evt_123","type":"customer.subscription.updated","created":1760000000,"data":{"object":{"id":"sub_123","customer":"cus_123","status":"active"}}}`,
+			wantError: "stripe_subscription_object_required",
+		},
+		{
+			name:      "wrong subscription object discriminator",
+			body:      `{"id":"evt_123","type":"customer.subscription.updated","created":1760000000,"data":{"object":{"id":"sub_123","object":"customer","customer":"cus_123","status":"active"}}}`,
+			wantError: "stripe_subscription_object_invalid",
+		},
+		{
+			name:      "missing status",
+			body:      `{"id":"evt_123","type":"customer.subscription.updated","created":1760000000,"data":{"object":{"id":"sub_123","object":"subscription","customer":"cus_123"}}}`,
+			wantError: "stripe_subscription_status_required",
+		},
 	}
 
 	for _, tc := range cases {
