@@ -35,6 +35,7 @@ SignalRelay currently includes:
 * [Changelog](CHANGELOG.md)
 * [SignalRelay concept note](docs/signalrelay.md)
 * [Local API](docs/api.md)
+* [Docker validation](docs/docker.md)
 * [Prototype checkpoint](docs/checkpoints/prototype-1.md)
 * [Prototype checkpoint 2](docs/checkpoints/prototype-2.md)
 
