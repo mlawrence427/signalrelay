@@ -39,6 +39,7 @@ SignalRelay currently includes:
 * [Docker validation](docs/docker.md)
 * [Prototype checkpoint](docs/checkpoints/prototype-1.md)
 * [Prototype checkpoint 2](docs/checkpoints/prototype-2.md)
+* [Prototype checkpoint 3](docs/checkpoints/prototype-3.md)
 
 ## Non-capabilities
 
