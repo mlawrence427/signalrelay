@@ -135,6 +135,44 @@ The prototype also accepts unsigned demo Stripe-shaped subscription events at `P
 
 Repeated demo Stripe events with the same event id are treated as duplicates and do not rewrite the stored envelope. This is duplicate event protection, not workflow retry orchestration.
 
+## Container
+
+Container support is for local prototype usage.
+
+The demo Stripe ingestion endpoint remains unsigned. Do not expose the demo ingestion endpoint publicly.
+
+Build:
+
+```bash
+docker build -t signalrelay:local .
+```
+
+Run memory mode:
+
+```bash
+docker run --rm -p 8080:8080 signalrelay:local
+```
+
+Run SQLite mode with a mounted volume:
+
+```bash
+docker run --rm -p 8080:8080 \
+  -e SIGNALRELAY_STORE=sqlite \
+  -e SIGNALRELAY_DB_PATH=/data/signalrelay.db \
+  -v signalrelay-data:/data \
+  signalrelay:local
+```
+
+PowerShell:
+
+```powershell
+docker run --rm -p 8080:8080 `
+  -e SIGNALRELAY_STORE=sqlite `
+  -e SIGNALRELAY_DB_PATH=/data/signalrelay.db `
+  -v signalrelay-data:/data `
+  signalrelay:local
+```
+
 ## Examples and smoke tests
 
 The `examples/` directory includes static Stripe subscription envelopes. Refresh `observed_at` and `stale_after` if you need an example response to report `fresh`.
