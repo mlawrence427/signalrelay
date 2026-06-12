@@ -1,23 +1,21 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
-	"os"
-	"strings"
 
+	"github.com/mlawrence427/signalrelay/internal/config"
 	"github.com/mlawrence427/signalrelay/internal/server"
 	"github.com/mlawrence427/signalrelay/internal/store"
 )
 
 func main() {
-	addr := ":8080"
-	if port := os.Getenv("PORT"); port != "" {
-		addr = ":" + port
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	stateStore, closeStore, err := openStore()
+	stateStore, closeStore, err := openStore(cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -25,29 +23,33 @@ func main() {
 
 	srv := server.New(stateStore)
 
-	log.Printf("signalrelay listening on %s", addr)
-	if err := http.ListenAndServe(addr, srv.Routes()); err != nil {
+	logStartup(cfg)
+	if err := http.ListenAndServe(cfg.Addr, srv.Routes()); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func openStore() (server.Store, func() error, error) {
-	switch strings.ToLower(os.Getenv("SIGNALRELAY_STORE")) {
-	case "", "memory":
+func openStore(cfg config.Config) (server.Store, func() error, error) {
+	switch cfg.Store {
+	case config.StoreMemory:
 		return store.NewMemory(), func() error { return nil }, nil
-	case "sqlite":
-		path := os.Getenv("SIGNALRELAY_DB_PATH")
-		if path == "" {
-			path = "signalrelay.db"
-		}
-
-		sqliteStore, err := store.NewSQLite(path)
+	case config.StoreSQLite:
+		sqliteStore, err := store.NewSQLite(cfg.DBPath)
 		if err != nil {
 			return nil, nil, err
 		}
 
 		return sqliteStore, sqliteStore.Close, nil
 	default:
-		return nil, nil, fmt.Errorf("unknown SIGNALRELAY_STORE %q (expected memory or sqlite)", os.Getenv("SIGNALRELAY_STORE"))
+		return nil, nil, config.StoreError(cfg.Store)
 	}
+}
+
+func logStartup(cfg config.Config) {
+	if cfg.Store == config.StoreSQLite {
+		log.Printf("signalrelay starting addr=%s store=%s db_path=%s", cfg.Addr, cfg.Store, cfg.DBPath)
+		return
+	}
+
+	log.Printf("signalrelay starting addr=%s store=%s", cfg.Addr, cfg.Store)
 }

@@ -10,15 +10,24 @@ The API does not verify real Stripe webhook signatures, authenticate requests, o
 
 The default local prototype store is in memory.
 
+Runtime configuration:
+
+```bash
+SIGNALRELAY_ADDR=:8080
+SIGNALRELAY_STORE=memory
+SIGNALRELAY_DB_PATH=signalrelay.db
+```
+
 To use optional SQLite persistence:
 
 ```bash
-SIGNALRELAY_STORE=sqlite SIGNALRELAY_DB_PATH=signalrelay.db go run ./cmd/signalrelay
+SIGNALRELAY_ADDR=:8080 SIGNALRELAY_STORE=sqlite SIGNALRELAY_DB_PATH=signalrelay.db go run ./cmd/signalrelay
 ```
 
 On Windows PowerShell:
 
 ```powershell
+$env:SIGNALRELAY_ADDR=":8080"
 $env:SIGNALRELAY_STORE="sqlite"
 $env:SIGNALRELAY_DB_PATH="signalrelay.db"
 go run ./cmd/signalrelay
