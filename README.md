@@ -17,6 +17,7 @@ It is not production software.
 Read the concept note:
 
 * [SignalRelay concept note](docs/signalrelay.md)
+* [Prototype checkpoint](docs/checkpoints/prototype-1.md)
 
 SignalRelay is not a service mesh, feature flag system, policy engine, workflow engine, webhook platform, generic cache, or authorization layer.
 
